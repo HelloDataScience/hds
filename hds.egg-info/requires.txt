@@ -1,0 +1,11 @@
+numpy
+pandas
+scipy
+seaborn
+matplotlib
+statsmodels
+scikit-learn
+graphviz
+requests
+bs4
+varname

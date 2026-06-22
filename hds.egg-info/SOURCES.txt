@@ -1,0 +1,12 @@
+LICENSE
+README.md
+pyproject.toml
+setup.py
+hds/__init__.py
+hds/plot.py
+hds/stat.py
+hds.egg-info/PKG-INFO
+hds.egg-info/SOURCES.txt
+hds.egg-info/dependency_links.txt
+hds.egg-info/requires.txt
+hds.egg-info/top_level.txt
