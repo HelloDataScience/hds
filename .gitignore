@@ -9,6 +9,11 @@ __pycache__/
 *.egg-info/
 .Python
 
+# 빌드 산출물
+build/
+dist/
+*.bak
+
 # Jupyter Notebook
 .ipynb_checkpoints/
 
