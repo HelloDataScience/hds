@@ -1,6 +1,4 @@
 # 관련 라이브러리 호출
-import warnings
-
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -12,7 +10,7 @@ import statsmodels.stats.outliers_influence as oi
 from scipy import stats
 from sklearn import metrics
 
-from hds._utils import deprecated_alias, try_import
+from hds._utils import renamed_alias, try_import
 
 
 # 선형 회귀 모델을 적합하는 함수
@@ -487,7 +485,7 @@ def breusch_pagan(model: statsmodels.api.OLS) -> pd.DataFrame:
 
 
 # 잔차의 등분산성 검정 함수(이전 이름)
-breushpagan = deprecated_alias(breusch_pagan, 'breushpagan')
+breushpagan = renamed_alias(breusch_pagan, 'breushpagan')
 
 
 # 분산팽창지수 반환 함수
@@ -625,7 +623,7 @@ def reg_metrics(y_true: np.ndarray, y_pred: np.ndarray) -> pd.DataFrame:
 
 
 # 회귀 모델의 성능 지표 반환 함수(이전 이름)
-regmetrics = deprecated_alias(reg_metrics, 'regmetrics')
+regmetrics = renamed_alias(reg_metrics, 'regmetrics')
 
 
 # 로지스틱 회귀 모델을 적합하는 함수
@@ -709,7 +707,7 @@ def clf_metrics(y_true: np.ndarray, y_pred: np.ndarray) -> None:
 
 
 # 분류 모델의 성능 지표 반환 함수(이전 이름)
-clfmetrics = deprecated_alias(clf_metrics, 'clfmetrics')
+clfmetrics = renamed_alias(clf_metrics, 'clfmetrics')
 
 
 # 분류 모델의 분류 기준점별 성능 지표 계산(TPR, FPR, MCC)
@@ -786,8 +784,9 @@ def epi_roc(
     ax: plt.Axes = None,
 ) -> plt.Axes:
     """
-    이 함수는 'hds.plot.roc_cutoff' 함수의 이전 이름입니다. 시각화 함수는
-    hds.plot 모듈로 옮겼으므로 앞으로 'plot.roc_cutoff' 함수를 사용하세요.
+    이 함수는 'hds.plot.roc_cutoff' 함수의 이전 이름이며 동작이 같습니다.
+    시각화 함수는 hds.plot 모듈로 옮겼으므로 새로 작성하는 코드에서는
+    'plot.roc_cutoff' 함수를 사용하세요.
 
     매개변수:
         y_true: 목표변수의 실제값을 pd.Series 또는 1차원 np.ndarray로
@@ -802,15 +801,6 @@ def epi_roc(
     """
     # 순환 참조를 피하려고 함수 안에서 호출
     from hds.plot import roc_cutoff
-
-    warnings.warn(
-        message=(
-            "'epi_roc' 함수는 'hds.plot.roc_cutoff' 함수로 옮겼습니다. "
-            "앞으로 'plot.roc_cutoff' 함수를 사용하세요."
-        ),
-        category=DeprecationWarning,
-        stacklevel=2,
-    )
 
     return roc_cutoff(y_true=y_true, y_prob=y_prob, ax=ax)
 

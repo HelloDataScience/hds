@@ -1,7 +1,6 @@
 # 관련 라이브러리 호출
 import functools
 import importlib
-import warnings
 from types import ModuleType
 
 
@@ -58,11 +57,11 @@ def try_import(module: str) -> ModuleType:
 
 
 # 이름을 바꾼 함수의 하위 호환 별칭을 생성하는 함수
-def deprecated_alias(func, old_name: str):
+def renamed_alias(func, old_name: str):
     """
-    이 함수는 이름을 바꾼 함수의 하위 호환 별칭을 생성합니다. 별칭을 실행하면
-    새로운 함수명을 안내하는 DeprecationWarning을 발생시키고 새로운 함수를
-    실행합니다.
+    이 함수는 이름을 바꾼 함수의 하위 호환 별칭을 생성합니다. 별칭은 경고
+    없이 새로운 함수를 그대로 실행하며, 도움말에만 새로운 함수명을
+    안내합니다.
 
     매개변수:
         func: 새로운 이름의 함수를 지정합니다.
@@ -75,21 +74,14 @@ def deprecated_alias(func, old_name: str):
 
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
-        warnings.warn(
-            message=(
-                f"'{old_name}' 함수는 '{new_name}' 함수로 이름이 "
-                f"바뀌었습니다. 앞으로 '{new_name}' 함수를 사용하세요."
-            ),
-            category=DeprecationWarning,
-            stacklevel=2,
-        )
         return func(*args, **kwargs)
 
     wrapper.__name__ = old_name
     wrapper.__qualname__ = old_name
     wrapper.__doc__ = (
-        f"이 함수는 '{new_name}' 함수의 이전 이름입니다. "
-        f"앞으로 '{new_name}' 함수를 사용하세요.\n\n{func.__doc__}"
+        f"이 함수는 '{new_name}' 함수의 이전 이름이며 동작이 같습니다. "
+        f"새로 작성하는 코드에서는 '{new_name}' 함수를 사용하세요."
+        f"\n\n{func.__doc__}"
     )
     return wrapper
 
