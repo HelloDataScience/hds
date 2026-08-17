@@ -1,5 +1,6 @@
 # 관련 라이브러리 호출
-import ipywidgets as widgets
+import warnings
+
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -8,9 +9,10 @@ import statsmodels
 import statsmodels.api as sma
 import statsmodels.formula.api as smf
 import statsmodels.stats.outliers_influence as oi
-from IPython.display import display
 from scipy import stats
 from sklearn import metrics
+
+from hds._utils import deprecated_alias, try_import
 
 
 # 선형 회귀 모델을 적합하는 함수
@@ -460,7 +462,7 @@ def augment(model: statsmodels.api.OLS) -> pd.DataFrame:
 
 
 # 잔차의 등분산성 검정 함수
-def breushpagan(model: statsmodels.api.OLS) -> pd.DataFrame:
+def breusch_pagan(model: statsmodels.api.OLS) -> pd.DataFrame:
     """
     이 함수는 선형 회귀 모델의 잔차 등분산성 검정을 실행합니다.
 
@@ -482,6 +484,10 @@ def breushpagan(model: statsmodels.api.OLS) -> pd.DataFrame:
     ).T
 
     return result
+
+
+# 잔차의 등분산성 검정 함수(이전 이름)
+breushpagan = deprecated_alias(breusch_pagan, 'breushpagan')
 
 
 # 분산팽창지수 반환 함수
@@ -562,7 +568,7 @@ def std_coefs(model: statsmodels.api.OLS) -> pd.Series:
 
 
 # 회귀 모델의 성능 지표 반환 함수
-def regmetrics(y_true: np.ndarray, y_pred: np.ndarray) -> pd.DataFrame:
+def reg_metrics(y_true: np.ndarray, y_pred: np.ndarray) -> pd.DataFrame:
     """
     이 함수는 회귀 모델의 다양한 성능 지표를 계산합니다.
 
@@ -618,6 +624,10 @@ def regmetrics(y_true: np.ndarray, y_pred: np.ndarray) -> pd.DataFrame:
     return result
 
 
+# 회귀 모델의 성능 지표 반환 함수(이전 이름)
+regmetrics = deprecated_alias(reg_metrics, 'regmetrics')
+
+
 # 로지스틱 회귀 모델을 적합하는 함수
 def glm(y: pd.Series, X: pd.DataFrame) -> statsmodels.api.GLM:
     """
@@ -639,7 +649,7 @@ def glm(y: pd.Series, X: pd.DataFrame) -> statsmodels.api.GLM:
 
 
 # 분류 모델의 성능 지표 반환 함수
-def clfmetrics(y_true: np.ndarray, y_pred: np.ndarray) -> None:
+def clf_metrics(y_true: np.ndarray, y_pred: np.ndarray) -> None:
     """
     이 함수는 분류 모델의 다양한 성능 지표를 계산합니다.
 
@@ -650,7 +660,9 @@ def clfmetrics(y_true: np.ndarray, y_pred: np.ndarray) -> None:
             지정합니다.
 
     반환:
-        분류 모델의 다양한 성능 지표를 출력합니다.
+        분류 모델의 다양한 성능 지표를 출력합니다. ipywidgets 패키지가
+        설치되어 있으면 혼동행렬과 성능 지표를 가로로 나란히 출력하고,
+        설치되어 있지 않으면 세로로 출력합니다.
     """
     y_labels = sorted(pd.Series(data=y_true).unique())
     cfm_labels = y_labels + ['All']
@@ -658,6 +670,26 @@ def clfmetrics(y_true: np.ndarray, y_pred: np.ndarray) -> None:
     cfm = cfm.reindex(index=cfm_labels, columns=cfm_labels, fill_value=0)
     cfm.index = [f'True_{i}' for i in cfm_labels]
     cfm.columns = [f'Pred_{i}' for i in cfm_labels]
+
+    report = metrics.classification_report(
+        y_true=y_true,
+        y_pred=y_pred,
+        digits=4,
+    )
+
+    widgets = try_import('ipywidgets')
+    ipython = try_import('IPython.display')
+
+    # ipywidgets가 없으면 혼동행렬과 성능 지표를 세로로 출력
+    if widgets is None or ipython is None:
+        print('▶ Confusion Matrix')
+        print(cfm.to_string())
+        print()
+        print('▶ Classification Report')
+        print(report)
+        return
+
+    display = ipython.display
 
     left = widgets.Output()
     right = widgets.Output()
@@ -667,19 +699,17 @@ def clfmetrics(y_true: np.ndarray, y_pred: np.ndarray) -> None:
         display(cfm)
     with right:
         print('▶ Classification Report')
-        print(
-            metrics.classification_report(
-                y_true=y_true,
-                y_pred=y_pred,
-                digits=4,
-            )
-        )
+        print(report)
 
     left.layout = widgets.Layout(margin='0px 10px 0px 0px')
     right.layout = widgets.Layout(margin='0px 0px 0px 10px')
 
     box = widgets.HBox(children=[left, right])
     display(box)
+
+
+# 분류 모델의 성능 지표 반환 함수(이전 이름)
+clfmetrics = deprecated_alias(clf_metrics, 'clfmetrics')
 
 
 # 분류 모델의 분류 기준점별 성능 지표 계산(TPR, FPR, MCC)
@@ -749,68 +779,40 @@ def clf_cutoffs(
     return result
 
 
-# 최적의 분류 기준점 시각화 함수
-def epi_roc(y_true: np.ndarray, y_prob: np.ndarray) -> None:
+# 최적의 분류 기준점 시각화 함수(이전 이름)
+def epi_roc(
+    y_true: np.ndarray,
+    y_prob: np.ndarray,
+    ax: plt.Axes = None,
+) -> plt.Axes:
     """
-    이 함수는 분류 모델에 대한 최적의 분류 기준점을 ROC 곡선에 추가합니다.
+    이 함수는 'hds.plot.roc_cutoff' 함수의 이전 이름입니다. 시각화 함수는
+    hds.plot 모듈로 옮겼으므로 앞으로 'plot.roc_cutoff' 함수를 사용하세요.
 
     매개변수:
         y_true: 목표변수의 실제값을 pd.Series 또는 1차원 np.ndarray로
             지정합니다.
         y_prob: 목표변수의 예측 확률을 pd.Series 또는 1차원 np.ndarray로
             지정합니다.
+        ax: 그래프를 그릴 matplotlib Axes 객체를 지정합니다. 생략하면 현재
+            Axes에 그린 다음 화면에 출력합니다.(기본값: None)
 
     반환:
-        ROC 곡선 그래프 외에 반환하는 객체는 없습니다.
+        그래프를 그린 matplotlib Axes 객체를 반환합니다.
     """
-    cutoff_df = clf_cutoffs(y_true, y_prob)
+    # 순환 참조를 피하려고 함수 안에서 호출
+    from hds.plot import roc_cutoff
 
-    # Draw ROC curve
-    sns.lineplot(data=cutoff_df, x='FPR', y='TPR', color='black')
-
-    # Add title
-    plt.title(
-        label='최적의 분류 기준점 탐색',
-        fontdict={'fontweight': 'bold'},
+    warnings.warn(
+        message=(
+            "'epi_roc' 함수는 'hds.plot.roc_cutoff' 함수로 옮겼습니다. "
+            "앞으로 'plot.roc_cutoff' 함수를 사용하세요."
+        ),
+        category=DeprecationWarning,
+        stacklevel=2,
     )
 
-    # Draw diagonal line
-    plt.plot(
-        [0, 1],
-        [0, 1],
-        color='0.5',
-        linestyle='--',
-        linewidth=0.5,
-    )
-
-    # Add the optimal point
-    optimal = cutoff_df.iloc[[cutoff_df['Optimal'].argmax()]]
-
-    sns.scatterplot(data=optimal, x='FPR', y='TPR', color='red')
-
-    # Add tangent line
-    opt_x = optimal['FPR'].iloc[0]
-    opt_y = optimal['TPR'].iloc[0]
-
-    intercept = opt_y - opt_x
-
-    plt.plot(
-        [0, 1 - intercept],
-        [intercept, 1],
-        color='red',
-        linestyle='-.',
-        linewidth=0.5,
-    )
-
-    # Add text
-    plt.text(
-        x=optimal['FPR'].values[0] - 0.01,
-        y=optimal['TPR'].values[0] + 0.01,
-        s=f"Cutoff = {optimal['Cutoff'].round(2).values[0]}",
-        ha='right',
-        va='bottom',
-    )
-    plt.show()
+    return roc_cutoff(y_true=y_true, y_prob=y_prob, ax=ax)
 
 
 # End of Document

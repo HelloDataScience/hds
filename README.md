@@ -13,7 +13,8 @@
 하나로** 제공합니다.
 
 - 📊 **plot** — EDA 시각화 (상자그림, 산점도·회귀직선, 막대그래프, 히트맵,
-  KDE, 의사결정나무, 변수 중요도, ROC/PR 곡선, 주성분·군집 진단 등)
+  KDE, 의사결정나무, 변수 중요도, 규제 회귀 계수 경로, ROC/PR 곡선,
+  주성분·군집 진단 등)
 - 📈 **stat** — 회귀 분석 도우미 (변수선택법, 잔차 진단, VIF, 영향점,
   표준화 회귀계수, 회귀·분류 성능 지표 등)
 
@@ -31,7 +32,30 @@ pip install hds
 pip install --upgrade hds
 ```
 
-> 의사결정나무 시각화 함수 `plot.tree()`는 시스템에
+### 선택 설치 옵션 (Extras)
+
+기본 설치는 `numpy`·`pandas`·`scipy`·`matplotlib`·`seaborn`·`statsmodels`·
+`scikit-learn`만 내려받습니다. 일부 함수는 아래 추가 패키지가 있어야 하며,
+필요한 것만 골라 설치합니다.
+
+| 옵션 | 추가 패키지 | 필요한 함수 |
+| --- | --- | --- |
+| `tree` | graphviz | `plot.tree()` |
+| `font` | requests, beautifulsoup4 | `plot.add_google_font()` |
+| `notebook` | ipywidgets, ipython | `stat.clf_metrics()`의 가로 배치 출력 |
+| `varname` | varname | `plot.roc_curve()`·`plot.pr_curve()`의 범례 변수명 자동 표시 |
+| `all` | 위 전체 | — |
+
+```bash
+pip install 'hds[tree]'   # 필요한 옵션만
+pip install 'hds[all]'    # 0.2.x와 동일한 구성
+```
+
+설치하지 않은 상태로 해당 함수를 호출하면 설치 방법을 안내하는 메시지가
+나타납니다. `stat.clf_metrics()`와 ROC·PR 곡선의 범례는 추가 패키지가 없어도
+동작합니다.
+
+> 의사결정나무 시각화 함수 `plot.tree()`는 파이썬 패키지 외에 시스템에도
 > [Graphviz](https://graphviz.org/download/) 실행 파일이 설치되어 있어야
 > 합니다. (`brew install graphviz` 등)
 
@@ -63,8 +87,41 @@ plot.corr_heatmap(data=iris)
 plot.kde2d(data=iris, x='petal_length', y='petal_width', scatter=True)
 ```
 
-각 함수는 그래프를 그린 뒤 `plt.show()`를 호출하므로, 스크립트·노트북
-어디서든 결과가 바로 표시됩니다.
+### 여러 그래프를 한 화면에 배치하기
+
+`plot` 모듈의 시각화 함수는 `ax` 매개변수를 지원하고 그래프를 그린
+matplotlib `Axes` 객체를 반환합니다. (PNG 파일로 저장하는 `plot.tree()`와
+그래프 4종을 한 번에 그리는 `stat.regression_diagnosis()`는 제외입니다.)
+
+- `ax`를 생략하면 예전처럼 현재 `Axes`에 그린 뒤 `plt.show()`로 바로
+  출력합니다.
+- `ax`를 지정하면 `plt.show()`를 호출하지 않으므로, 여러 함수를 하나의
+  `Figure`에 배치하거나 축·제목을 직접 손볼 수 있습니다.
+
+```python
+import matplotlib.pyplot as plt
+from hds import plot
+
+fig, axes = plt.subplots(2, 2, figsize=(12, 8))
+
+plot.box_group(data=iris, x='species', y='petal_length', ax=axes[0, 0])
+plot.regline(data=iris, x='petal_length', y='petal_width', ax=axes[0, 1])
+plot.bar_freq(data=iris, x='species', ax=axes[1, 0])
+plot.corr_heatmap(data=iris, ax=axes[1, 1])
+
+fig.tight_layout()
+plt.show()
+```
+
+ROC 곡선처럼 여러 모델을 겹쳐 그릴 때도 같은 `Axes`를 넘기고 `label`로
+모델명을 지정합니다.
+
+```python
+fig, ax = plt.subplots()
+
+plot.roc_curve(y_true=y_test, y_prob=prob_a, label='의사결정나무', ax=ax)
+plot.roc_curve(y_true=y_test, y_prob=prob_b, label='랜덤 포레스트', ax=ax)
+```
 
 ### 회귀 분석 예시
 
@@ -100,7 +157,9 @@ stat.regression_diagnosis(model)  # 잔차 진단 그래프 4종
 | `kde2d` | 이차원 커널 밀도(등고선) |
 | `tree` | 의사결정나무 시각화(PNG 저장) |
 | `feature_importance` | 입력변수 중요도 |
+| `coef_path` | 규제 회귀(Lasso·Ridge·ElasticNet) 회귀계수 경로 |
 | `roc_curve` / `pr_curve` | ROC 곡선·AUC / PR 곡선·AP |
+| `roc_cutoff` | 최적 분류 기준점 시각화 |
 | `screeplot` / `biplot` | 주성분 분석 진단 |
 | `wcss` / `silhouette` | k-평균 군집 수 진단 |
 | `add_google_font` | 구글 폰트 설치(한글 폰트 등) |
@@ -112,26 +171,44 @@ stat.regression_diagnosis(model)  # 잔차 진단 그래프 4종
 | `ols` / `glm` | 선형 회귀 / 로지스틱 회귀 적합 |
 | `stepwise` | 변수선택법(`forward`·`backward`·`both`) |
 | `regression_diagnosis` | 잔차 가정 진단 그래프 4종 |
-| `vif` | 분산팽창지수 |
+| `vif` / `breusch_pagan` | 분산팽창지수 / 잔차 등분산성 검정 |
 | `cooks_distance` / `leverage` / `augment` | 영향점·레버리지 진단 |
 | `coefs` / `std_coefs` | 회귀계수 / 표준화 회귀계수 |
-| `regmetrics` / `clfmetrics` | 회귀 / 분류 성능 지표 |
-| `clf_cutoffs` / `epi_roc` | 최적 분류 기준점 탐색·시각화 |
+| `reg_metrics` / `clf_metrics` | 회귀 / 분류 성능 지표 |
+| `clf_cutoffs` | 최적 분류 기준점 탐색(표) |
+
+---
+
+## 함수명 변경 (0.3.0)
+
+`snake_case`로 이름을 통일하고, 그래프를 그리는 함수는 `plot` 모듈로
+옮겼습니다. 이전 이름도 그대로 동작하지만 `DeprecationWarning`이 나타납니다.
+
+| 이전 이름 | 새 이름 |
+| --- | --- |
+| `stat.regmetrics` | `stat.reg_metrics` |
+| `stat.clfmetrics` | `stat.clf_metrics` |
+| `stat.breushpagan` | `stat.breusch_pagan` (철자 교정) |
+| `stat.epi_roc` | `plot.roc_cutoff` |
 
 ---
 
 ## 대표 함수 시그니처 (API)
 
 ```python
-# hds.plot
-box_group(data, x, y, palette=None, legend=False) -> None
-scatter(data, x, y, color='0.3') -> None
-regline(data, x, y, color='0.3', size=15) -> None
-bar_freq(data, x, color=None, palette=None, legend=False) -> None
-corr_heatmap(data, palette='RdYlBu', fontsize=8) -> None
-kde2d(data, x, y, frac=0.2, seed=0, scatter=False) -> None
-feature_importance(model, palette='Spectral') -> None
-roc_curve(y_true, y_prob, pos_label=None, color=None) -> None
+# hds.plot  (tree를 제외한 시각화 함수는 ax=None을 받고 Axes를 반환)
+box_group(data, x, y, palette=None, legend=False, ax=None) -> plt.Axes
+scatter(data, x, y, color='0.3', ax=None) -> plt.Axes
+regline(data, x, y, color='0.3', size=15, ax=None) -> plt.Axes
+bar_freq(data, x, color=None, palette=None, legend=False, ax=None) -> plt.Axes
+corr_heatmap(data, palette='RdYlBu', fontsize=8, ax=None) -> plt.Axes
+kde2d(data, x, y, frac=0.2, seed=0, scatter=False, ax=None) -> plt.Axes
+feature_importance(model, palette='Spectral', ax=None) -> plt.Axes
+coef_path(X, y, model='lasso', alphas=None, l1_ratio=0.5, standardize=True,
+          alpha=None, palette='Spectral', legend=True, ax=None) -> plt.Axes
+roc_curve(y_true, y_prob, pos_label=None, color=None,
+          label=None, ax=None) -> plt.Axes
+roc_cutoff(y_true, y_prob, ax=None) -> plt.Axes
 tree(model, file_name=None, class_name=None) -> None
 
 # hds.stat
@@ -140,8 +217,21 @@ glm(y, X) -> statsmodels GLM
 stepwise(y, X, direction='both') -> statsmodels OLS
 regression_diagnosis(model) -> None
 vif(model) -> pd.DataFrame
-regmetrics(y_true, y_pred) -> pd.DataFrame
+reg_metrics(y_true, y_pred) -> pd.DataFrame
+clf_metrics(y_true, y_pred) -> None
 clf_cutoffs(y_true, y_prob) -> pd.DataFrame
+```
+
+### 규제 회귀 계수 경로 예시
+
+```python
+from hds import plot
+
+# alpha(규제 강도)가 커질수록 회귀계수가 0으로 수렴하는 과정을 확인
+plot.coef_path(X=X_train, y=y_train, model='lasso')
+
+# 교차검증으로 고른 alpha를 세로 점선으로 표시
+plot.coef_path(X=X_train, y=y_train, model='lasso', alpha=model_cv.alpha_)
 ```
 
 > 모든 함수는 한글 docstring을 제공합니다. `help(plot.box_group)` 또는
@@ -151,14 +241,14 @@ clf_cutoffs(y_true, y_prob) -> pd.DataFrame
 
 ## 의존성 (Requirements)
 
-- Python >= 3.11
-- numpy, pandas, scipy
-- matplotlib, seaborn
-- statsmodels, scikit-learn
-- graphviz, requests, bs4, varname
-- ipywidgets, ipython
+- Python >= 3.10
+- **필수**: numpy, pandas, scipy, matplotlib, seaborn(>=0.13),
+  statsmodels, scikit-learn(>=1.4)
+- **선택**: graphviz(`tree`), requests·beautifulsoup4(`font`),
+  ipywidgets·ipython(`notebook`), varname(`varname`)
 
-설치 시 위 패키지가 자동으로 함께 설치됩니다.
+필수 패키지는 설치 시 자동으로 함께 설치되고, 선택 패키지는
+[선택 설치 옵션](#선택-설치-옵션-extras)으로 필요할 때만 설치합니다.
 
 ---
 
