@@ -27,20 +27,20 @@ from hds._utils import import_optional, try_import
 
 
 # 그래프를 그릴 Axes를 준비하는 함수
-def _prepare_ax(ax: plt.Axes) -> tuple:
+def _prepare_ax(ax: plt.Axes) -> plt.Axes:
     """
     이 함수는 그래프를 그릴 Axes 객체를 준비합니다. ax를 생략하면 현재 Axes를
-    사용하고 그래프를 화면에 출력하도록 설정합니다.
+    사용합니다.
 
     매개변수:
         ax: matplotlib Axes 객체를 지정합니다.
 
     반환값:
-        Axes 객체와 화면 출력 여부를 튜플로 반환합니다.
+        Axes 객체를 반환합니다.
     """
     if ax is None:
-        return plt.gca(), True
-    return ax, False
+        return plt.gca()
+    return ax
 
 
 # 호출부에서 인수로 지정한 변수명을 반환하는 함수
@@ -257,12 +257,12 @@ def box_group(
         palette: 팔레트를 리스트로 지정합니다.
         legend: 범례 추가 여부를 True 또는 False로 지정합니다.(기본값: False)
         ax: 그래프를 그릴 matplotlib Axes 객체를 지정합니다. 생략하면 현재
-            Axes에 그린 다음 화면에 출력합니다.(기본값: None)
+            Axes에 그립니다.(기본값: None)
 
     반환값:
         그래프를 그린 matplotlib Axes 객체를 반환합니다.
     """
-    ax, show = _prepare_ax(ax)
+    ax = _prepare_ax(ax)
 
     avg = data.groupby(by=x)[y].mean()
 
@@ -313,9 +313,6 @@ def box_group(
         fontdict={'fontweight': 'bold'},
     )
 
-    if show:
-        plt.show()
-
     return ax
 
 
@@ -336,12 +333,12 @@ def scatter(
         y: 결과가 되는 연속형 변수명을 문자열로 지정합니다.
         color: 점의 채우기 색을 문자열로 지정합니다.(기본값: '0.3')
         ax: 그래프를 그릴 matplotlib Axes 객체를 지정합니다. 생략하면 현재
-            Axes에 그린 다음 화면에 출력합니다.(기본값: None)
+            Axes에 그립니다.(기본값: None)
 
     반환값:
         그래프를 그린 matplotlib Axes 객체를 반환합니다.
     """
-    ax, show = _prepare_ax(ax)
+    ax = _prepare_ax(ax)
 
     sns.scatterplot(data=data, x=x, y=y, color=color, ax=ax)
 
@@ -349,9 +346,6 @@ def scatter(
         label=f'{x}와(과) {y}의 관계',
         fontdict={'fontweight': 'bold'},
     )
-
-    if show:
-        plt.show()
 
     return ax
 
@@ -375,12 +369,12 @@ def regline(
         color: 점의 채우기 색을 문자열로 지정합니다.(기본값: '0.3')
         size: 점의 크기를 정수로 지정합니다.(기본값: 15)
         ax: 그래프를 그릴 matplotlib Axes 객체를 지정합니다. 생략하면 현재
-            Axes에 그린 다음 화면에 출력합니다.(기본값: None)
+            Axes에 그립니다.(기본값: None)
 
     반환값:
         그래프를 그린 matplotlib Axes 객체를 반환합니다.
     """
-    ax, show = _prepare_ax(ax)
+    ax = _prepare_ax(ax)
 
     sns.regplot(
         data=data,
@@ -405,9 +399,6 @@ def regline(
         fontdict={'fontweight': 'bold'},
     )
 
-    if show:
-        plt.show()
-
     return ax
 
 
@@ -430,12 +421,12 @@ def bar_freq(
         palette: 팔레트를 리스트로 지정합니다.
         legend: 범례 추가 여부를 True 또는 False로 지정합니다.(기본값: False)
         ax: 그래프를 그릴 matplotlib Axes 객체를 지정합니다. 생략하면 현재
-            Axes에 그린 다음 화면에 출력합니다.(기본값: None)
+            Axes에 그립니다.(기본값: None)
 
     반환값:
         그래프를 그린 matplotlib Axes 객체를 반환합니다.
     """
-    ax, show = _prepare_ax(ax)
+    ax = _prepare_ax(ax)
 
     counts = data[x].value_counts().sort_index()
     max_count = counts.values.max()
@@ -474,9 +465,6 @@ def bar_freq(
         fontdict={'fontweight': 'bold'},
     )
 
-    if show:
-        plt.show()
-
     return ax
 
 
@@ -498,12 +486,12 @@ def bar_dodge_freq(
         g: x를 소그룹으로 나눌 범주형 변수명을 문자열로 지정합니다.
         palette: 팔레트를 리스트로 지정합니다.
         ax: 그래프를 그릴 matplotlib Axes 객체를 지정합니다. 생략하면 현재
-            Axes에 그린 다음 화면에 출력합니다.(기본값: None)
+            Axes에 그립니다.(기본값: None)
 
     반환값:
         그래프를 그린 matplotlib Axes 객체를 반환합니다.
     """
-    ax, show = _prepare_ax(ax)
+    ax = _prepare_ax(ax)
 
     counts = data.groupby(by=[x, g]).count().iloc[:, 0]
     max_count = counts.values.max()
@@ -541,9 +529,6 @@ def bar_dodge_freq(
     )
     ax.legend(loc='center left', bbox_to_anchor=(1, 0.5), fontsize=8)
 
-    if show:
-        plt.show()
-
     return ax
 
 
@@ -567,12 +552,12 @@ def bar_stack_freq(
         kind: 막대 그래프의 종류를 'bar' 또는 'barh'로 지정합니다.(기본값: 'bar')
         palette: 팔레트를 리스트로 지정합니다.
         ax: 그래프를 그릴 matplotlib Axes 객체를 지정합니다. 생략하면 현재
-            Axes에 그린 다음 화면에 출력합니다.(기본값: None)
+            Axes에 그립니다.(기본값: None)
 
     반환값:
         그래프를 그린 matplotlib Axes 객체를 반환합니다.
     """
-    ax, show = _prepare_ax(ax)
+    ax = _prepare_ax(ax)
 
     n_groups = data[g].unique().size
 
@@ -636,9 +621,6 @@ def bar_stack_freq(
     )
     ax.legend(loc='center left', bbox_to_anchor=(1, 0.5), fontsize=8)
 
-    if show:
-        plt.show()
-
     return ax
 
 
@@ -662,12 +644,12 @@ def bar_stack_prop(
         kind: 막대 그래프의 종류를 'bar' 또는 'barh'로 지정합니다.(기본값: 'bar')
         palette: 팔레트를 리스트로 지정합니다.(기본값: None)
         ax: 그래프를 그릴 matplotlib Axes 객체를 지정합니다. 생략하면 현재
-            Axes에 그린 다음 화면에 출력합니다.(기본값: None)
+            Axes에 그립니다.(기본값: None)
 
     반환값:
         그래프를 그린 matplotlib Axes 객체를 반환합니다.
     """
-    ax, show = _prepare_ax(ax)
+    ax = _prepare_ax(ax)
 
     n_groups = data[g].unique().size
 
@@ -736,9 +718,6 @@ def bar_stack_prop(
     )
     ax.legend(loc='center left', bbox_to_anchor=(1, 0.5), fontsize=8)
 
-    if show:
-        plt.show()
-
     return ax
 
 
@@ -757,12 +736,12 @@ def corr_heatmap(
         palette: 팔레트를 리스트로 지정합니다.(기본값: 'RdYlBu')
         fontsize: 주석(상관계수)의 글자 크기를 지정합니다.(기본값: 8)
         ax: 그래프를 그릴 matplotlib Axes 객체를 지정합니다. 생략하면 현재
-            Axes에 그린 다음 화면에 출력합니다.(기본값: None)
+            Axes에 그립니다.(기본값: None)
 
     반환값:
         그래프를 그린 matplotlib Axes 객체를 반환합니다.
     """
-    ax, show = _prepare_ax(ax)
+    ax = _prepare_ax(ax)
 
     corr = data.corr(numeric_only=True)
     mask = np.triu(m=np.ones_like(a=corr, dtype=bool), k=1)
@@ -782,9 +761,6 @@ def corr_heatmap(
         label='변수 간 상관계수 행렬',
         fontdict={'fontweight': 'bold'},
     )
-
-    if show:
-        plt.show()
 
     return ax
 
@@ -810,12 +786,12 @@ def kde2d(
         seed: 시드 초기값을 정수로 지정합니다.(기본값: 0)
         scatter: 산점도 추가 여부를 True 또는 False로 지정합니다.(기본값: False)
         ax: 그래프를 그릴 matplotlib Axes 객체를 지정합니다. 생략하면 현재
-            Axes에 그린 다음 화면에 출력합니다.(기본값: None)
+            Axes에 그립니다.(기본값: None)
 
     반환값:
         그래프를 그린 matplotlib Axes 객체를 반환합니다.
     """
-    ax, show = _prepare_ax(ax)
+    ax = _prepare_ax(ax)
 
     levels = np.arange(start=0.05, stop=1.05, step=0.05)
     sns.kdeplot(
@@ -843,9 +819,6 @@ def kde2d(
         label=f'{x}와 {y}의 관계',
         fontdict={'fontweight': 'bold'},
     )
-
-    if show:
-        plt.show()
 
     return ax
 
@@ -926,12 +899,12 @@ def feature_importance(
         model: 사이킷런으로 적합한 분류 모델을 지정합니다.
         palette: 팔레트를 문자열로 지정합니다.(기본값: Spectral)
         ax: 그래프를 그릴 matplotlib Axes 객체를 지정합니다. 생략하면 현재
-            Axes에 그린 다음 화면에 출력합니다.(기본값: None)
+            Axes에 그립니다.(기본값: None)
 
     반환값:
         그래프를 그린 matplotlib Axes 객체를 반환합니다.
     """
-    ax, show = _prepare_ax(ax)
+    ax = _prepare_ax(ax)
 
     if 'LGBM' in str(type(model)):
         names = model.feature_name_
@@ -976,9 +949,6 @@ def feature_importance(
     ax.set_xlabel(xlabel='Feature Importances')
     ax.set_ylabel(ylabel='Feature')
 
-    if show:
-        plt.show()
-
     return ax
 
 
@@ -1016,12 +986,12 @@ def coef_path(
         palette: 팔레트를 문자열로 지정합니다.(기본값: 'Spectral')
         legend: 범례 추가 여부를 True 또는 False로 지정합니다.(기본값: True)
         ax: 그래프를 그릴 matplotlib Axes 객체를 지정합니다. 생략하면 현재
-            Axes에 그린 다음 화면에 출력합니다.(기본값: None)
+            Axes에 그립니다.(기본값: None)
 
     반환값:
         그래프를 그린 matplotlib Axes 객체를 반환합니다.
     """
-    ax, show = _prepare_ax(ax)
+    ax = _prepare_ax(ax)
 
     if isinstance(X, pd.DataFrame):
         X_mat = X.drop(labels=['const'], axis=1, errors='ignore')
@@ -1106,9 +1076,6 @@ def coef_path(
     else:
         remove_legend(ax)
 
-    if show:
-        plt.show()
-
     return ax
 
 
@@ -1135,12 +1102,12 @@ def step(
         title: 그래프의 제목을 문자열로 지정합니다.(기본값: None)
         xangle: x축 회전 각도를 정수로 지정합니다.(기본값: None)
         ax: 그래프를 그릴 matplotlib Axes 객체를 지정합니다. 생략하면 현재
-            Axes에 그린 다음 화면에 출력합니다.(기본값: None)
+            Axes에 그립니다.(기본값: None)
 
     반환값:
         그래프를 그린 matplotlib Axes 객체를 반환합니다.
     """
-    ax, show = _prepare_ax(ax)
+    ax = _prepare_ax(ax)
 
     sns.lineplot(
         data=data,
@@ -1159,9 +1126,6 @@ def step(
 
     if xangle is not None:
         ax.tick_params(axis='x', rotation=xangle)
-
-    if show:
-        plt.show()
 
     return ax
 
@@ -1188,12 +1152,12 @@ def roc_curve(
             패키지가 설치된 경우 y_prob로 지정한 변수명을 사용합니다.
             (기본값: None)
         ax: 그래프를 그릴 matplotlib Axes 객체를 지정합니다. 생략하면 현재
-            Axes에 그린 다음 화면에 출력합니다.(기본값: None)
+            Axes에 그립니다.(기본값: None)
 
     반환값:
         그래프를 그린 matplotlib Axes 객체를 반환합니다.
     """
-    ax, show = _prepare_ax(ax)
+    ax = _prepare_ax(ax)
 
     if label is None:
         label = _arg_name('y_prob')
@@ -1245,9 +1209,6 @@ def roc_curve(
     ax.set_ylabel(ylabel='TPR')
     ax.legend(loc='lower right', fontsize=8)
 
-    if show:
-        plt.show()
-
     return ax
 
 
@@ -1273,12 +1234,12 @@ def pr_curve(
             패키지가 설치된 경우 y_prob로 지정한 변수명을 사용합니다.
             (기본값: None)
         ax: 그래프를 그릴 matplotlib Axes 객체를 지정합니다. 생략하면 현재
-            Axes에 그린 다음 화면에 출력합니다.(기본값: None)
+            Axes에 그립니다.(기본값: None)
 
     반환값:
         그래프를 그린 matplotlib Axes 객체를 반환합니다.
     """
-    ax, show = _prepare_ax(ax)
+    ax = _prepare_ax(ax)
 
     if label is None:
         label = _arg_name('y_prob')
@@ -1329,9 +1290,6 @@ def pr_curve(
     ax.set_ylabel(ylabel='Precision')
     ax.legend(loc='lower left', fontsize=8)
 
-    if show:
-        plt.show()
-
     return ax
 
 
@@ -1352,7 +1310,7 @@ def roc_cutoff(
         y_prob: 목표변수의 예측 확률을 pd.Series 또는 1차원 np.ndarray로
             지정합니다.
         ax: 그래프를 그릴 matplotlib Axes 객체를 지정합니다. 생략하면 현재
-            Axes에 그린 다음 화면에 출력합니다.(기본값: None)
+            Axes에 그립니다.(기본값: None)
 
     반환값:
         그래프를 그린 matplotlib Axes 객체를 반환합니다.
@@ -1360,7 +1318,7 @@ def roc_cutoff(
     # 순환 참조를 피하려고 함수 안에서 호출
     from hds.stat import clf_cutoffs
 
-    ax, show = _prepare_ax(ax)
+    ax = _prepare_ax(ax)
 
     cutoff_df = clf_cutoffs(y_true, y_prob)
 
@@ -1410,9 +1368,6 @@ def roc_cutoff(
         va='bottom',
     )
 
-    if show:
-        plt.show()
-
     return ax
 
 
@@ -1424,12 +1379,12 @@ def screeplot(X: pd.DataFrame, ax: plt.Axes = None) -> plt.Axes:
     매개변수:
         X: 주성분 점수 행렬을 데이터프레임으로 지정합니다.
         ax: 그래프를 그릴 matplotlib Axes 객체를 지정합니다. 생략하면 현재
-            Axes에 그린 다음 화면에 출력합니다.(기본값: None)
+            Axes에 그립니다.(기본값: None)
 
     반환값:
         그래프를 그린 matplotlib Axes 객체를 반환합니다.
     """
-    ax, show = _prepare_ax(ax)
+    ax = _prepare_ax(ax)
 
     variances = X.var()
     n = len(variances)
@@ -1451,9 +1406,6 @@ def screeplot(X: pd.DataFrame, ax: plt.Axes = None) -> plt.Axes:
     ax.set_title(label='Scree Plot', fontdict={'fontweight': 'bold'})
     ax.set_xlabel(xlabel='Number of PC')
     ax.set_ylabel(ylabel='Variance')
-
-    if show:
-        plt.show()
 
     return ax
 
@@ -1477,12 +1429,12 @@ def biplot(
         y: y축에 지정할 주성분의 인덱스를 정수로 지정합니다.(기본값: 2)
         zoom: 변수의 벡터 크기를 조절하는 값을 실수로 지정합니다.(기본값: 1.0)
         ax: 그래프를 그릴 matplotlib Axes 객체를 지정합니다. 생략하면 현재
-            Axes에 그린 다음 화면에 출력합니다.(기본값: None)
+            Axes에 그립니다.(기본값: None)
 
     반환값:
         그래프를 그린 matplotlib Axes 객체를 반환합니다.
     """
-    ax, show = _prepare_ax(ax)
+    ax = _prepare_ax(ax)
 
     xs = score.iloc[:, x - 1]
     ys = score.iloc[:, y - 1]
@@ -1531,9 +1483,6 @@ def biplot(
     ax.set_xlabel(xlabel=f'PC{x}')
     ax.set_ylabel(ylabel=f'PC{y}')
 
-    if show:
-        plt.show()
-
     return ax
 
 
@@ -1546,12 +1495,12 @@ def wcss(X: pd.DataFrame, k: int = 3, ax: plt.Axes = None) -> plt.Axes:
         X: 표준화된 데이터셋을 데이터프레임으로 지정합니다.
         k: 군집 개수를 정수로 지정합니다.(기본값: 3)
         ax: 그래프를 그릴 matplotlib Axes 객체를 지정합니다. 생략하면 현재
-            Axes에 그린 다음 화면에 출력합니다.(기본값: None)
+            Axes에 그립니다.(기본값: None)
 
     반환값:
         그래프를 그린 matplotlib Axes 객체를 반환합니다.
     """
-    ax, show = _prepare_ax(ax)
+    ax = _prepare_ax(ax)
 
     ks = range(1, k + 1)
     result = []
@@ -1575,9 +1524,6 @@ def wcss(X: pd.DataFrame, k: int = 3, ax: plt.Axes = None) -> plt.Axes:
     ax.set_xlabel(xlabel='Number of clusters')
     ax.set_ylabel(ylabel='Within Cluster Sum of Squares')
 
-    if show:
-        plt.show()
-
     return ax
 
 
@@ -1590,12 +1536,12 @@ def silhouette(X: pd.DataFrame, k: int = 3, ax: plt.Axes = None) -> plt.Axes:
         X: 표준화된 데이터셋을 데이터프레임으로 지정합니다.
         k: 군집 개수를 정수로 지정합니다.(기본값: 3)
         ax: 그래프를 그릴 matplotlib Axes 객체를 지정합니다. 생략하면 현재
-            Axes에 그린 다음 화면에 출력합니다.(기본값: None)
+            Axes에 그립니다.(기본값: None)
 
     반환값:
         그래프를 그린 matplotlib Axes 객체를 반환합니다.
     """
-    ax, show = _prepare_ax(ax)
+    ax = _prepare_ax(ax)
 
     ks = range(1, k + 1)
     result = [0]
@@ -1625,9 +1571,6 @@ def silhouette(X: pd.DataFrame, k: int = 3, ax: plt.Axes = None) -> plt.Axes:
     )
     ax.set_xlabel(xlabel='Number of clusters')
     ax.set_ylabel(ylabel='Silhouette Width Average')
-
-    if show:
-        plt.show()
 
     return ax
 

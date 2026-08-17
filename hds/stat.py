@@ -243,7 +243,7 @@ def regression_diagnosis(model: statsmodels.api.OLS) -> None:
             지정합니다.
 
     반환:
-        네 가지 그래프 외에 반환하는 객체는 없습니다.
+        네 가지 그래프를 하나의 Figure에 그리며, 반환하는 객체는 없습니다.
     """
     plt.figure(figsize=(10, 10), dpi=100)
 
@@ -340,7 +340,6 @@ def regression_diagnosis(model: statsmodels.api.OLS) -> None:
         text.set_va('center')
 
     plt.tight_layout()
-    plt.show()
 
 
 # 쿡의 거리 계산 함수
@@ -794,7 +793,7 @@ def epi_roc(
         y_prob: 목표변수의 예측 확률을 pd.Series 또는 1차원 np.ndarray로
             지정합니다.
         ax: 그래프를 그릴 matplotlib Axes 객체를 지정합니다. 생략하면 현재
-            Axes에 그린 다음 화면에 출력합니다.(기본값: None)
+            Axes에 그립니다.(기본값: None)
 
     반환:
         그래프를 그린 matplotlib Axes 객체를 반환합니다.

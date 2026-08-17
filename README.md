@@ -87,16 +87,28 @@ plot.corr_heatmap(data=iris)
 plot.kde2d(data=iris, x='petal_length', y='petal_width', scatter=True)
 ```
 
+> 시각화 함수는 `seaborn`과 마찬가지로 `plt.show()`를 호출하지 않고 `Axes`를
+> 반환합니다. 주피터·VS Code 노트북은 셀 실행이 끝나면 그래프를 자동으로
+> 출력하므로 위 코드만으로 충분하고, `.py` 스크립트에서는 마지막에
+> `plt.show()`를 직접 호출하세요. 셀 마지막 줄에 찍히는 `<Axes: ...>` 문구는
+> 코드 끝에 세미콜론(`;`)을 붙이면 사라집니다.
+
 ### 여러 그래프를 한 화면에 배치하기
 
 `plot` 모듈의 시각화 함수는 `ax` 매개변수를 지원하고 그래프를 그린
 matplotlib `Axes` 객체를 반환합니다. (PNG 파일로 저장하는 `plot.tree()`와
 그래프 4종을 한 번에 그리는 `stat.regression_diagnosis()`는 제외입니다.)
 
-- `ax`를 생략하면 예전처럼 현재 `Axes`에 그린 뒤 `plt.show()`로 바로
-  출력합니다.
-- `ax`를 지정하면 `plt.show()`를 호출하지 않으므로, 여러 함수를 하나의
-  `Figure`에 배치하거나 축·제목을 직접 손볼 수 있습니다.
+- `ax`를 생략하면 현재 `Axes`에 그립니다. 함수는 `plt.show()`를 호출하지
+  않으므로 그래프에 선이나 주석을 이어서 덧붙일 수 있습니다.
+- `ax`를 지정하면 여러 함수를 하나의 `Figure`에 배치하거나 축·제목을 직접
+  손볼 수 있습니다.
+
+```python
+# 함수가 그린 그래프에 그대로 이어서 덧그립니다.
+plot.regline(data=cars, x='Weight', y='Price')
+plt.axvline(x=1250, color='red', linestyle='--');
+```
 
 ```python
 import matplotlib.pyplot as plt
