@@ -430,7 +430,6 @@ def bar_freq(
 
     counts = data[x].value_counts().sort_index()
     max_count = counts.values.max()
-    offset = np.ceil(max_count * 0.01)
 
     sns.countplot(
         data=data,
@@ -443,10 +442,11 @@ def bar_freq(
     )
 
     for i, value in enumerate(counts):
-        ax.text(
-            x=i,
-            y=value + offset,
-            s=value,
+        ax.annotate(
+            text=value,
+            xy=(i, value),
+            xytext=(0, 3),
+            textcoords='offset points',
             ha='center',
             va='bottom',
             c='black',
@@ -493,9 +493,8 @@ def bar_dodge_freq(
     """
     ax = _prepare_ax(ax)
 
-    counts = data.groupby(by=[x, g]).count().iloc[:, 0]
+    counts = data.groupby(by=[x, g]).size()
     max_count = counts.values.max()
-    offset = np.ceil(max_count * 0.01)
 
     sns.countplot(
         data=data,
@@ -507,20 +506,21 @@ def bar_dodge_freq(
         ax=ax,
     )
 
-    for i, value in enumerate(counts):
-        if i % 2 == 0:
-            pos = i / 2 - 0.2
-        else:
-            pos = (i - 1) / 2 + 0.2
-        ax.text(
-            x=pos,
-            y=value + offset,
-            s=value,
-            ha='center',
-            va='bottom',
-            fontsize=8,
-            fontweight='bold',
-        )
+    for container in ax.containers:
+        for bar in container:
+            height = bar.get_height()
+            if height == 0:
+                continue
+            ax.annotate(
+                text=int(height),
+                xy=(bar.get_x() + bar.get_width() / 2, height),
+                xytext=(0, 3),
+                textcoords='offset points',
+                ha='center',
+                va='bottom',
+                fontsize=8,
+                fontweight='bold',
+            )
 
     ax.set_ylim(0, max_count * 1.2)
     ax.set_title(
@@ -931,10 +931,11 @@ def feature_importance(
     )
 
     for i, row in importance_df.iterrows():
-        ax.text(
-            x=row['importance'] + 0.01,
-            y=i,
-            s=f"{row['importance']:.3f}",
+        ax.annotate(
+            text=f"{row['importance']:.3f}",
+            xy=(row['importance'], i),
+            xytext=(3, 0),
+            textcoords='offset points',
             ha='left',
             va='center',
             fontsize=8,
