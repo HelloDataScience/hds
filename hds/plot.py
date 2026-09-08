@@ -901,8 +901,13 @@ def tree(
     # png 파일을 저장할 폴더가 없으면 생성
     os.makedirs(name=path, exist_ok=True)
 
+    file_path = os.path.join(path, f'{file_name}.png')
+
+    # dot 소스를 파일로 쓰지 않고 Graphviz에 직접 전달해 png만 저장
     graph = graphviz.Source(source=source, format='png')
-    file_path = graph.render(filename=file_name, directory=path, cleanup=True)
+
+    with open(file=file_path, mode='wb') as file:
+        file.write(graph.pipe(format='png'))
 
     print(f'Saved to {file_path}')
 
