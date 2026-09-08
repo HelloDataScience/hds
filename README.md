@@ -167,7 +167,7 @@ stat.regression_diagnosis(model)  # 잔차 진단 그래프 4종
 | `bar_dodge_freq` / `bar_stack_freq` / `bar_stack_prop` | 소그룹 막대그래프(펼침·도수누적·비율누적) |
 | `corr_heatmap` | 상관계수 히트맵 |
 | `kde2d` | 이차원 커널 밀도(등고선) |
-| `tree` | 의사결정나무 시각화(PNG 저장) |
+| `tree` | 의사결정나무 시각화(`image` 폴더에 PNG 저장) |
 | `feature_importance` | 입력변수 중요도 |
 | `coef_path` | 규제 회귀(Lasso·Ridge·ElasticNet) 회귀계수 경로 |
 | `roc_curve` / `pr_curve` | ROC 곡선·AUC / PR 곡선·AP |
@@ -188,6 +188,30 @@ stat.regression_diagnosis(model)  # 잔차 진단 그래프 4종
 | `coefs` / `std_coefs` | 회귀계수 / 표준화 회귀계수 |
 | `reg_metrics` / `clf_metrics` | 회귀 / 분류 성능 지표 |
 | `clf_cutoffs` | 최적 분류 기준점 탐색(표) |
+
+---
+
+## 변경 사항 (0.3.3)
+
+- `plot.tree()`가 PNG 파일을 **`image` 폴더에 저장**합니다. 현재 작업 경로가
+  `image` 폴더이면 그 자리에, 그 밖에는 현재 작업 경로와 형제 관계인 `image`
+  폴더에 저장하며 폴더가 없으면 새로 만듭니다. `path` 매개변수로 저장할
+  폴더를 직접 지정할 수도 있습니다.
+
+  ```python
+  plot.tree(model)                      # 작업 경로가 data면 ../image/model.png
+  plot.tree(model, path='../output')    # ../output/model.png
+  ```
+
+  중간 산출물인 `.dot` 파일을 아예 만들지 않으므로 작업 폴더에 임시 파일이
+  남지 않습니다. 의사결정나무가 아닌 모델을 지정하면 안내 메시지와 함께
+  `TypeError`가 발생합니다.
+- `plot.biplot()`의 제목이 `x`·`y`로 지정한 주성분 번호를 따라갑니다. 이전에는
+  `x=3, y=4`로 바꿔도 제목이 늘 `Biplot with PC1 and PC2`로 나와 축 이름과
+  어긋났습니다. 변수 화살표도 주성분 개수가 아닌 변수 개수만큼 그리므로,
+  주성분을 줄여서 계산한 결과에서 화살표가 빠지지 않습니다.
+- `plot.bar_freq()`의 제목이 `x`로 지정한 변수명을 따라갑니다. 이전에는
+  "목표변수의 범주별 도수 비교"로 고정되어 있었습니다.
 
 ---
 
@@ -222,7 +246,7 @@ coef_path(X, y, model='lasso', alphas=None, l1_ratio=0.5, standardize=True,
 roc_curve(y_true, y_prob, pos_label=None, color=None,
           label=None, ax=None) -> plt.Axes
 roc_cutoff(y_true, y_prob, ax=None) -> plt.Axes
-tree(model, file_name=None, class_name=None) -> None
+tree(model, file_name=None, class_name=None, path=None) -> None
 
 # hds.stat
 ols(y, X) -> statsmodels OLS
