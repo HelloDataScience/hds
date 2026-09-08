@@ -412,7 +412,8 @@ def bar_freq(
     ax: plt.Axes = None,
 ) -> plt.Axes:
     """
-    이 함수는 범주형 변수의 도수를 내림차순 정렬한 막대 그래프를 그립니다.
+    이 함수는 범주형 변수의 도수를 범주명 순으로 정렬한 막대 그래프를
+    그립니다.
 
     매개변수:
         data: 데이터프레임을 지정합니다.
@@ -461,7 +462,7 @@ def bar_freq(
 
     ax.set_ylim(0, max_count * 1.2)
     ax.set_title(
-        label='목표변수의 범주별 도수 비교',
+        label=f'{x}의 범주별 도수 비교',
         fontdict={'fontweight': 'bold'},
     )
 
@@ -828,14 +829,21 @@ def tree(
     model,
     file_name: str = None,
     class_name: str = None,
+    path: str = None,
 ) -> None:
     """
-    이 함수는 의사결정나무 모델을 시각화하여 png 파일로 저장합니다.
+    이 함수는 의사결정나무 모델을 시각화하여 png 파일로 저장합니다. 저장할
+    폴더가 없으면 새로 만듭니다.
 
     매개변수:
         model: 사이킷런으로 적합한 의사결정나무 모델을 지정합니다.
-        file_name: 입력변수명을 문자열로 지정합니다.(기본값: None)
+        file_name: 저장할 파일명을 확장자 없이 문자열로 지정합니다. 생략하면
+            model로 지정한 변수명을 사용합니다.(기본값: None)
         class_name: 분류 모델은 목표변수의 범주를 문자열로 지정합니다.(기본값: None)
+        path: png 파일을 저장할 폴더를 문자열로 지정합니다. 생략하면 현재
+            작업 경로가 image 폴더일 때 현재 작업 경로에 저장하고, 그 밖에는
+            현재 작업 경로와 형제 관계인 image 폴더에 저장합니다. 해당 폴더가
+            없으면 새로 만듭니다.(기본값: None)
 
     반환값:
         그래프 외에 반환하는 객체는 없습니다.
@@ -855,10 +863,17 @@ def tree(
         result = [name for name, value in global_objs if value is model]
         file_name = result[0]
 
+    # png 파일을 저장할 폴더 지정
+    if path is None:
+        if os.path.basename(os.getcwd()) == 'image':
+            path = '.'
+        else:
+            path = os.path.join('..', 'image')
+
     if isinstance(model, DecisionTreeRegressor):
-        export_graphviz(
+        source = export_graphviz(
             decision_tree=model,
-            out_file=f'{file_name}.dot',
+            out_file=None,
             feature_names=model.feature_names_in_,
             filled=True,
             leaves_parallel=False,
@@ -867,23 +882,29 @@ def tree(
     elif isinstance(model, DecisionTreeClassifier):
         if class_name is None:
             class_name = model.classes_.astype(str)
-        export_graphviz(
+        source = export_graphviz(
             decision_tree=model,
-            out_file=f'{file_name}.dot',
+            out_file=None,
             class_names=class_name,
             feature_names=model.feature_names_in_,
             filled=True,
             leaves_parallel=False,
             impurity=True,
         )
+    else:
+        raise TypeError(
+            'model은 사이킷런으로 적합한 의사결정나무 모델'
+            '(DecisionTreeRegressor 또는 DecisionTreeClassifier)로 '
+            '지정하세요.'
+        )
 
-    with open(file=f'{file_name}.dot', mode='rt') as file:
-        graph = file.read()
-        graph = graphviz.Source(source=graph, format='png')
-        graph.render(filename=file_name)
+    # png 파일을 저장할 폴더가 없으면 생성
+    os.makedirs(name=path, exist_ok=True)
 
-    os.remove(f'{file_name}')
-    os.remove(f'{file_name}.dot')
+    graph = graphviz.Source(source=source, format='png')
+    file_path = graph.render(filename=file_name, directory=path, cleanup=True)
+
+    print(f'Saved to {file_path}')
 
 
 # 입력변수별 중요도 시각화
@@ -1453,7 +1474,7 @@ def biplot(
     ax.axvline(x=0, color='0.5', linestyle='--', linewidth=0.5)
     ax.axhline(y=0, color='0.5', linestyle='--', linewidth=0.5)
 
-    n = score.shape[1]
+    n = coefs.shape[0]
 
     for i in range(n):
         ax.arrow(
@@ -1478,7 +1499,7 @@ def biplot(
         )
 
     ax.set_title(
-        label='Biplot with PC1 and PC2',
+        label=f'Biplot with PC{x} and PC{y}',
         fontdict={'fontweight': 'bold'},
     )
     ax.set_xlabel(xlabel=f'PC{x}')
