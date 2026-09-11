@@ -129,6 +129,29 @@ def test_std_coefs_supported_models(reg_data, logit_data):
     assert list(result.index) == ['const', 'x1', 'x2']
 
 
+def test_std_coefs_matches_standardized_regression(reg_data):
+    y, X = reg_data
+    result = stat.std_coefs(model=stat.ols(y=y, X=X))
+
+    # 입력변수와 목표변수를 표준화하여 적합한 회귀계수와 같아야 함
+    X_std = (X - X.mean()) / X.std()
+    y_std = (y - y.mean()) / y.std()
+    expected = sma.OLS(endog=y_std, exog=sma.add_constant(X_std)).fit()
+
+    names = ['x1', 'x2', 'x3']
+    np.testing.assert_allclose(result[names], expected.params[names])
+
+
+def test_std_coefs_glm_scales_only_inputs(logit_data):
+    y, X = logit_data
+    model = stat.glm(y=y, X=X)
+    result = stat.std_coefs(model=model)
+
+    names = ['x1', 'x2']
+    expected = model.params[names] * X[names].std()
+    np.testing.assert_allclose(result[names], expected)
+
+
 def test_std_coefs_unsupported_model(logit_data):
     y, X = logit_data
     model = sma.Logit(endog=y, exog=sma.add_constant(X)).fit(disp=0)
