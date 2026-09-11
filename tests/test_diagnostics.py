@@ -6,7 +6,6 @@ import pytest
 import statsmodels.api as sma
 import statsmodels.formula.api as smf
 import statsmodels.stats.outliers_influence as oi
-from scipy import stats
 
 from hds import stat
 
@@ -50,8 +49,21 @@ def test_std_resid_keeps_original_index(reg_data):
     assert set(result.index) == set(model.resid.index)
     assert result.abs().is_monotonic_decreasing
 
-    expected = stats.zscore(model.resid.to_numpy())
-    np.testing.assert_allclose(result.loc[model.resid.index], expected)
+
+def test_std_resid_is_internally_studentized(reg_data):
+    y, X = reg_data
+    X = X.copy()
+    X.iloc[0, 0] = 8  # 레버리지가 큰 관측값
+    model = stat.ols(y=y, X=X)
+    result = stat.std_resid(model=model).loc[model.resid.index]
+
+    # 잔차 / (잔차 표준오차 × sqrt(1 - 레버리지))
+    hat = stat.leverage(X=X).loc[model.resid.index]
+    sigma = np.sqrt(model.ssr / model.df_resid)
+    expected = model.resid / (sigma * np.sqrt(1 - hat))
+
+    np.testing.assert_allclose(result, expected)
+    np.testing.assert_allclose(result, stat.augment(model=model)['std_resid'])
 
 
 # vif()
@@ -97,6 +109,22 @@ def test_regression_diagnosis_returns_figure_and_axes(reg_data):
 
     titles = [ax.get_title() for ax in axes.flatten()[:3]]
     assert titles == ['Residuals vs Fitted', 'Normal Q-Q', 'Scale-Location']
+
+
+def test_regression_diagnosis_uses_studentized_residuals(reg_data):
+    y, X = reg_data
+    model = stat.ols(y=y, X=X)
+    expected = np.sort(model.get_influence().resid_studentized_internal)
+    _, axes = stat.regression_diagnosis(model=model)
+
+    qq_points = axes[0, 1].collections[0].get_offsets()
+    np.testing.assert_allclose(np.sort(qq_points[:, 1]), expected)
+
+    scale_points = axes[1, 0].collections[0].get_offsets()
+    np.testing.assert_allclose(
+        np.sort(scale_points[:, 1]),
+        np.sort(np.sqrt(np.abs(expected))),
+    )
 
 
 def test_regression_diagnosis_does_not_draw_on_current_figure(reg_data):
