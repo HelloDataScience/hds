@@ -665,7 +665,9 @@ def std_coefs(model: statsmodels.api.OLS) -> pd.Series:
         model: statsmodels의 OLS 또는 GLM으로 적합한 회귀 모델을 지정합니다.
 
     반환:
-        회귀 모델의 표준화된 회귀계수를 반환합니다. GLM 모델은 입력변수만
+        회귀 모델의 표준화된 회귀계수를 반환합니다. 표준편차는 표본
+        표준편차(ddof=1)로 계산하므로, OLS 모델은 입력변수와 목표변수를
+        표준화하여 적합한 회귀계수와 같습니다. GLM 모델은 입력변수만
         표준화하므로 입력변수가 1 표준편차 증가할 때 선형 예측값(로지스틱
         회귀는 로그 오즈)의 변화량을 반환합니다.
     """
@@ -683,7 +685,8 @@ def std_coefs(model: statsmodels.api.OLS) -> pd.Series:
     )
 
     if isinstance(fitted_model, sma.OLS):
-        y = model.model.endog
+        # 목표변수도 입력변수와 같이 표본 표준편차(ddof=1)로 계산
+        y = pd.Series(data=model.model.endog)
         result = model.params * (X.std() / y.std())
     else:
         result = model.params * (X.std() / 1)
