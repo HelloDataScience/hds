@@ -324,7 +324,8 @@ def stepwise(
 def regression_diagnosis(model: statsmodels.api.OLS) -> tuple:
     """
     이 함수는 선형 회귀 모델의 잔차가정 만족 여부를 확인하는 다양한 그래프를
-    그립니다.
+    그립니다. 정규 Q-Q 그래프와 Scale-Location 그래프의 표준화 잔차는
+    레버리지를 반영한 내부 학생화 잔차이며, R의 plot() 함수와 같습니다.
 
     매개변수:
         model: statsmodels.formula.api.ols 함수로 적합한 선형 회귀 모델을
@@ -361,8 +362,8 @@ def regression_diagnosis(model: statsmodels.api.OLS) -> tuple:
     ax1.set_ylabel(ylabel='Residuals', fontdict=dict(size=12))
 
     # 정규성 가정 확인
-    # 표준화 잔차(Standardized residuals)
-    stdres = stats.zscore(a=np.asarray(model.resid))
+    # 표준화 잔차(Standardized residuals): 레버리지를 반영한 내부 학생화 잔차
+    stdres = np.asarray(model.get_influence().resid_studentized)
 
     # 이론상 분위수(Theoretical Quantiles)
     (x, y), _ = stats.probplot(x=stdres)
@@ -498,7 +499,9 @@ def leverage(X: pd.DataFrame) -> pd.Series:
 # 표준화 잔차 계산 함수
 def std_resid(model: statsmodels.api.OLS) -> pd.Series:
     """
-    이 함수는 선형 회귀 모델의 잔차를 표준화합니다.
+    이 함수는 선형 회귀 모델의 잔차를 표준화합니다. 표준화 잔차는 잔차를
+    잔차 표준오차와 sqrt(1 - 레버리지)의 곱으로 나눈 내부 학생화 잔차이며,
+    R의 rstandard() 함수 및 augment() 함수의 std_resid 열과 같습니다.
 
     매개변수:
         model: statsmodels.formula.api.ols 함수로 적합한 선형 회귀 모델을
@@ -511,7 +514,7 @@ def std_resid(model: statsmodels.api.OLS) -> pd.Series:
     resid = pd.Series(data=model.resid)
 
     stdres = pd.Series(
-        data=stats.zscore(a=resid.to_numpy()),
+        data=np.asarray(model.get_influence().resid_studentized),
         index=resid.index,
     )
 
