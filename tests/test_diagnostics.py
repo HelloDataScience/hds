@@ -135,16 +135,23 @@ def test_regression_diagnosis_does_not_draw_on_current_figure(reg_data):
     assert current.axes == []
 
 
-def test_regression_diagnosis_qq_line_covers_data(reg_data):
+def test_regression_diagnosis_qq_line_follows_quantiles(reg_data):
     y, X = reg_data
     y = y.copy()
-    y.iloc[0] += 30  # 표준화 잔차가 4를 넘는 이상치
+    y.iloc[0] += 30  # 표준화 잔차가 이론상 분위수 범위를 크게 벗어나는 이상치
     _, axes = stat.regression_diagnosis(model=stat.ols(y=y, X=X))
 
     ax = axes[0, 1]
     points = ax.collections[0].get_offsets()
     line = ax.get_lines()[-1]
+    low, high = points[:, 0].min(), points[:, 0].max()
 
-    assert points.max() > 4
-    assert min(line.get_xdata()) == pytest.approx(points.min())
-    assert max(line.get_xdata()) == pytest.approx(points.max())
+    assert points[:, 1].max() > high + 1
+    assert min(line.get_xdata()) == pytest.approx(low)
+    assert max(line.get_xdata()) == pytest.approx(high)
+
+    # 가로축이 표준화 잔차 범위로 늘어나지 않아야 함
+    xmin, xmax = ax.get_xlim()
+    margin = 0.1 * (high - low)
+    assert low - margin <= xmin
+    assert xmax <= high + margin
