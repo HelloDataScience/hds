@@ -1,4 +1,6 @@
 # 관련 라이브러리 호출
+import keyword
+
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -10,27 +12,129 @@ import statsmodels.stats.outliers_influence as oi
 from scipy import stats
 from sklearn import metrics
 
-from hds._utils import renamed_alias, try_import
+from hds._utils import (
+    as_frame,
+    pos_proba,
+    renamed_alias,
+    resolve_pos_label,
+    try_import,
+)
+
+
+# 입력변수 행렬의 복사본에 상수항을 추가하는 함수
+def _add_const(X: pd.DataFrame, index: pd.Index = None) -> pd.DataFrame:
+    """
+    이 함수는 입력변수 행렬을 복사하고, 'const' 열이 없으면 첫 번째 열로
+    상수항을 추가합니다. 원본 입력변수 행렬은 변경하지 않습니다.
+
+    매개변수:
+        X: 입력변수 행렬을 pd.DataFrame 또는 2차원 np.ndarray로 지정합니다.
+        index: X가 np.ndarray일 때 행 인덱스로 사용할 인덱스를 지정합니다.
+            (기본값: None)
+
+    반환:
+        상수항을 추가한 입력변수 행렬의 복사본을 반환합니다.
+    """
+    X = as_frame(X=X, index=index)
+
+    if 'const' not in X.columns:
+        X.insert(loc=0, column='const', value=1)
+
+    return X
 
 
 # 선형 회귀 모델을 적합하는 함수
 def ols(y: pd.Series, X: pd.DataFrame) -> statsmodels.api.OLS:
     """
-    이 함수는 선형 회귀 모델을 적합합니다.
+    이 함수는 선형 회귀 모델을 적합합니다. 입력변수 행렬에 'const' 열이
+    없으면 상수항을 추가하며, 원본 입력변수 행렬은 변경하지 않습니다.
 
     매개변수:
         y: 목표변수 벡터를 pd.Series 또는 1차원 np.ndarray로 지정합니다.
         X: 입력변수 행렬을 pd.DataFrame 또는 2차원 np.ndarray로 지정합니다.
+            np.ndarray의 열 이름은 x1, x2, ... 순서로 지정합니다.
 
     반환:
         선형 회귀 모델을 반환합니다.
     """
-    if 'const' not in X.columns:
-        X.insert(loc=0, column='const', value=1)
+    X = _add_const(X=X, index=y.index if isinstance(y, pd.Series) else None)
 
     model = sma.OLS(endog=y, exog=X)
 
     return model.fit()
+
+
+# 수식에 사용할 변수명을 반환하는 함수
+def _term(name: str) -> str:
+    """
+    이 함수는 변수명을 statsmodels 수식에 사용할 수 있는 형태로 반환합니다.
+    공백이나 특수문자가 있어 파이썬 식별자로 사용할 수 없는 변수명은 Q()로
+    감쌉니다.
+
+    매개변수:
+        name: 변수명을 문자열로 지정합니다.
+
+    반환:
+        수식에 사용할 변수명을 문자열로 반환합니다.
+    """
+    if name.isidentifier() and not keyword.iskeyword(name):
+        return name
+
+    return f'Q({name!r})'
+
+
+# 목표변수명과 입력변수명으로 선형 회귀 수식을 생성하는 함수
+def _formula(y_name: str, x_vars: list) -> str:
+    """
+    이 함수는 목표변수명과 입력변수명으로 상수항을 포함하는 선형 회귀 수식을
+    생성합니다. 입력변수가 없으면 상수항만 있는 수식을 생성합니다.
+
+    매개변수:
+        y_name: 목표변수명을 문자열로 지정합니다.
+        x_vars: 입력변수명을 리스트로 지정합니다.
+
+    반환:
+        선형 회귀 수식을 문자열로 반환합니다.
+    """
+    terms = [_term(name=x_var) for x_var in x_vars] + ['1']
+
+    return f'{_term(name=y_name)} ~ {" + ".join(terms)}'
+
+
+# 변수선택법에 사용할 데이터를 준비하는 함수
+def _selection_data(y: pd.Series, X: pd.DataFrame) -> tuple:
+    """
+    이 함수는 변수선택법에 사용할 목표변수와 입력변수를 하나의 데이터프레임으로
+    합칩니다. 'const' 열은 제외하며, 원본 데이터는 변경하지 않습니다.
+
+    매개변수:
+        y: 목표변수 벡터를 pd.Series로 지정합니다. 이름이 없으면 'y'를
+            사용합니다.
+        X: 입력변수 행렬을 열 이름이 있는 pd.DataFrame으로 지정합니다.
+
+    반환:
+        합친 데이터프레임, 입력변수명 리스트, 목표변수명을 튜플로 반환합니다.
+        입력변수명은 X의 열 순서를 유지합니다.
+    """
+    if not isinstance(X, pd.DataFrame):
+        raise TypeError(
+            '변수선택법의 X는 열 이름이 있는 pd.DataFrame으로 지정해야 합니다.'
+        )
+
+    if not isinstance(y, pd.Series):
+        raise TypeError('변수선택법의 y는 pd.Series로 지정해야 합니다.')
+
+    X = X.drop(columns='const', errors='ignore').rename(columns=str)
+    y_name = 'y' if y.name is None else str(y.name)
+
+    if y_name in X.columns:
+        raise ValueError(
+            f"목표변수명 '{y_name}'과 같은 이름의 열이 X에 있습니다."
+        )
+
+    data = pd.concat(objs=[X, y.rename(y_name)], axis=1)
+
+    return data, list(X.columns), y_name
 
 
 # 선형 회귀 모델을 전진선택법으로 적합하는 함수
@@ -42,19 +146,15 @@ def forward_selection(
     이 함수는 다중 선형 회귀 모델을 전진선택법으로 적합합니다.
 
     매개변수:
-        y: 목표변수 벡터를 pd.Series 또는 1차원 np.ndarray로 지정합니다.
-        X: 입력변수 행렬을 pd.DataFrame 또는 2차원 np.ndarray로 지정합니다.
+        y: 목표변수 벡터를 pd.Series로 지정합니다.
+        X: 입력변수 행렬을 열 이름이 있는 pd.DataFrame으로 지정합니다.
 
     반환:
         전진선택법으로 회귀 모델을 적합하고 AIC 값이 최소인 모델을 반환합니다.
         statsmodels.formula.api.ols 함수를 사용합니다.
     """
-    if 'const' in X.columns:
-        X = X.drop(labels=['const'], axis=1)
-
-    x_vars = list(set(X.columns))
-    data = pd.concat(objs=[X, y], axis=1)
-    formula = f'{y.name} ~ 1'
+    data, x_vars, y_name = _selection_data(y=y, X=X)
+    formula = _formula(y_name=y_name, x_vars=[])
     curr_aic = smf.ols(formula=formula, data=data).fit().aic
 
     selected = []
@@ -62,7 +162,7 @@ def forward_selection(
     while x_vars:
         aic_candidates = []
         for x_var in x_vars:
-            formula = f'{y.name} ~ {" + ".join(selected + [x_var])} + 1'
+            formula = _formula(y_name=y_name, x_vars=selected + [x_var])
             aic = smf.ols(formula=formula, data=data).fit().aic
             aic = np.round(a=aic, decimals=4)
             aic_candidates.append((aic, x_var))
@@ -77,7 +177,7 @@ def forward_selection(
         else:
             break
 
-    formula = f'{y.name} ~ {" + ".join(selected)} + 1'
+    formula = _formula(y_name=y_name, x_vars=selected)
     model = smf.ols(formula=formula, data=data).fit()
 
     return model
@@ -92,30 +192,23 @@ def backward_selection(
     이 함수는 선형 회귀 모델을 후진소거법으로 적합합니다.
 
     매개변수:
-        y: 목표변수 벡터를 pd.Series 또는 1차원 np.ndarray로 지정합니다.
-        X: 입력변수 행렬을 pd.DataFrame 또는 2차원 np.ndarray로 지정합니다.
+        y: 목표변수 벡터를 pd.Series로 지정합니다.
+        X: 입력변수 행렬을 열 이름이 있는 pd.DataFrame으로 지정합니다.
 
     반환:
         후진소거법으로 회귀 모델을 적합하고 AIC 값이 최소인 모델을 반환합니다.
         statsmodels.formula.api.ols 함수를 사용합니다.
     """
-    if 'const' in X.columns:
-        X = X.drop(labels=['const'], axis=1)
-
-    x_vars = list(set(X.columns))
-    data = pd.concat(objs=[X, y], axis=1)
-    formula = f'{y.name} ~ {" + ".join(list(x_vars))}'
+    data, x_vars, y_name = _selection_data(y=y, X=X)
+    formula = _formula(y_name=y_name, x_vars=x_vars)
     curr_aic = smf.ols(formula=formula, data=data).fit().aic
-
-    selected = []
 
     while x_vars:
         aic_candidates = []
         for x_var in x_vars:
-            sub = data.drop(labels=selected + [x_var], axis=1).copy()
-            sub_vars = set(sub.columns) - {y.name}
-            formula = f'{y.name} ~ {" + ".join(list(sub_vars))} + 1'
-            aic = smf.ols(formula=formula, data=sub).fit().aic
+            sub_vars = [var for var in x_vars if var != x_var]
+            formula = _formula(y_name=y_name, x_vars=sub_vars)
+            aic = smf.ols(formula=formula, data=data).fit().aic
             aic = np.round(a=aic, decimals=4)
             aic_candidates.append((aic, x_var))
 
@@ -124,14 +217,11 @@ def backward_selection(
 
         if curr_aic > new_aic:
             x_vars.remove(best_var)
-            selected.append(best_var)
             curr_aic = new_aic
         else:
             break
 
-    data = data.drop(labels=selected, axis=1)
-    remaining_vars = set(data.columns) - {y.name}
-    formula = f'{y.name} ~ {" + ".join(list(remaining_vars))} + 1'
+    formula = _formula(y_name=y_name, x_vars=x_vars)
     model = smf.ols(formula=formula, data=data).fit()
 
     return model
@@ -146,19 +236,15 @@ def stepwise_selection(
     이 함수는 선형 회귀 모델을 단계적방법으로 적합합니다.
 
     매개변수:
-        y: 목표변수 벡터를 pd.Series 또는 1차원 np.ndarray로 지정합니다.
-        X: 입력변수 행렬을 pd.DataFrame 또는 2차원 np.ndarray로 지정합니다.
+        y: 목표변수 벡터를 pd.Series로 지정합니다.
+        X: 입력변수 행렬을 열 이름이 있는 pd.DataFrame으로 지정합니다.
 
     반환:
         단계적방법으로 회귀 모델을 적합하고 AIC 값이 최소인 모델을 반환합니다.
         statsmodels.formula.api.ols 함수를 사용합니다.
     """
-    if 'const' in X.columns:
-        X = X.drop(labels=['const'], axis=1)
-
-    x_vars = list(set(X.columns))
-    data = pd.concat(objs=[X, y], axis=1)
-    formula = f'{y.name} ~ 1'
+    data, x_vars, y_name = _selection_data(y=y, X=X)
+    formula = _formula(y_name=y_name, x_vars=[])
     curr_aic = smf.ols(formula=formula, data=data).fit().aic
 
     selected = []
@@ -166,18 +252,16 @@ def stepwise_selection(
     while x_vars:
         aic_candidates = []
         for x_var in x_vars:
-            formula = f'{y.name} ~ {" + ".join(selected + [x_var])} + 1'
+            formula = _formula(y_name=y_name, x_vars=selected + [x_var])
             aic = smf.ols(formula=formula, data=data).fit().aic
             aic = np.round(a=aic, decimals=4)
             aic_candidates.append((aic, 'add', x_var))
 
         if selected:
             for x_var in selected:
-                sub = data[selected + [y.name]].copy()
-                sub = sub.drop(labels=[x_var], axis=1)
-                sub_vars = set(sub.columns) - {y.name}
-                formula = f'{y.name} ~ {" + ".join(list(sub_vars))} + 1'
-                aic = smf.ols(formula=formula, data=sub).fit().aic
+                sub_vars = [var for var in selected if var != x_var]
+                formula = _formula(y_name=y_name, x_vars=sub_vars)
+                aic = smf.ols(formula=formula, data=data).fit().aic
                 aic = np.round(a=aic, decimals=4)
                 aic_candidates.append((aic, 'sub', x_var))
 
@@ -195,7 +279,7 @@ def stepwise_selection(
         elif curr_aic <= new_aic:
             break
 
-    formula = f'{y.name} ~ {" + ".join(selected)} + 1'
+    formula = _formula(y_name=y_name, x_vars=selected)
     model = smf.ols(formula=formula, data=data).fit()
 
     return model
@@ -211,8 +295,8 @@ def stepwise(
     이 함수는 세 가지 선형 회귀 모델의 변수선택법을 선택하는 함수입니다.
 
     매개변수:
-        y: 목표변수 벡터를 pd.Series 또는 1차원 np.ndarray로 지정합니다.
-        X: 입력변수 행렬을 pd.DataFrame 또는 2차원 np.ndarray로 지정합니다.
+        y: 목표변수 벡터를 pd.Series로 지정합니다.
+        X: 입력변수 행렬을 열 이름이 있는 pd.DataFrame으로 지정합니다.
         direction: 변수선택법을 'forward', 'backward' 또는 'both'에서
             선택합니다.(기본값: 'both')
 
@@ -227,7 +311,10 @@ def stepwise(
     elif direction == 'both':
         model = stepwise_selection(y, X)
     else:
-        model = None
+        raise ValueError(
+            "direction은 'forward', 'backward', 'both' 중에서 지정해야 "
+            f'합니다.(입력값: {direction!r})'
+        )
 
     return model
 
@@ -363,18 +450,18 @@ def cooks_distance(model: statsmodels.api.OLS) -> pd.DataFrame:
 # 햇 매트릭스 계산 함수
 def hat_matrix(X: pd.DataFrame) -> np.ndarray:
     """
-    이 함수는 입력변수 행렬로 햇 매트릭스(hat matrix)를 계산합니다.
+    이 함수는 입력변수 행렬로 햇 매트릭스(hat matrix)를 계산합니다. 입력변수
+    행렬에 'const' 열이 없으면 상수항을 추가하며, 원본 입력변수 행렬은
+    변경하지 않습니다.
 
     매개변수:
-        X: 입력변수 행렬을 pd.DataFrame으로 지정합니다.
+        X: 입력변수 행렬을 pd.DataFrame 또는 2차원 np.ndarray로 지정합니다.
 
     반환:
-        훈련셋의 햇 매트릭스를 반환합니다.
+        훈련셋의 햇 매트릭스를 반환합니다. 행과 열의 개수가 관측값 개수와
+        같으므로 관측값이 많으면 메모리를 많이 사용합니다.
     """
-    if 'const' not in X.columns:
-        X.insert(loc=0, column='const', value=1)
-
-    X = np.array(object=X)
+    X = np.asarray(_add_const(X=X), dtype=float)
     XtX = np.matmul(X.transpose(), X)
     XtX_inv = np.linalg.inv(XtX)
     result = np.matmul(np.matmul(X, XtX_inv), X.transpose())
@@ -383,25 +470,28 @@ def hat_matrix(X: pd.DataFrame) -> np.ndarray:
 
 
 # 레버리지(hat value) 계산 함수
-def leverage(X: pd.DataFrame) -> pd.DataFrame:
+def leverage(X: pd.DataFrame) -> pd.Series:
     """
-    이 함수는 입력변수 행렬로 레버리지(hat value)를 계산합니다.
+    이 함수는 입력변수 행렬로 레버리지(hat value)를 계산합니다. 입력변수
+    행렬에 'const' 열이 없으면 상수항을 추가하며, 원본 입력변수 행렬은
+    변경하지 않습니다.
 
     매개변수:
-        X: 입력변수 행렬을 pd.DataFrame으로 지정합니다.
+        X: 입력변수 행렬을 pd.DataFrame 또는 2차원 np.ndarray로 지정합니다.
 
     반환:
-        훈련셋의 관측값별 Leverage를 반환합니다.
+        훈련셋의 관측값별 Leverage를 내림차순으로 정렬하여 반환합니다.
     """
-    if 'const' not in X.columns:
-        X.insert(loc=0, column='const', value=1)
+    X = _add_const(X=X)
+    values = np.asarray(X, dtype=float)
 
-    n = X.shape[0]
-    hat_mat = hat_matrix(X=X)
-    X['Leverage'] = np.array([hat_mat[i][i] for i in range(n)])
-    X = X.iloc[:, -1].sort_values(ascending=False)
+    # 햇 매트릭스 전체를 만들지 않고 대각 원소만 계산
+    XtX_inv = np.linalg.inv(np.matmul(values.transpose(), values))
+    hat = np.sum(np.matmul(values, XtX_inv) * values, axis=1)
 
-    return X
+    result = pd.Series(data=hat, index=X.index, name='Leverage')
+
+    return result.sort_values(ascending=False)
 
 
 # 표준화 잔차 계산 함수
@@ -414,12 +504,17 @@ def std_resid(model: statsmodels.api.OLS) -> pd.Series:
             지정합니다.
 
     반환:
-        훈련셋의 관측값별 표준화 잔차를 반환합니다.
+        훈련셋의 관측값별 표준화 잔차를 절대값의 내림차순으로 반환합니다.
+        인덱스는 원래 관측값의 인덱스를 유지합니다.
     """
-    stdres = pd.Series(data=stats.zscore(a=model.resid))
-    locs = stdres.abs().sort_values(ascending=False)
+    resid = pd.Series(data=model.resid)
 
-    return stdres[locs.index]
+    stdres = pd.Series(
+        data=stats.zscore(a=resid.to_numpy()),
+        index=resid.index,
+    )
+
+    return stdres.sort_values(ascending=False, key=lambda x: x.abs())
 
 
 # 선형 회귀 모델의 영향점 계산 함수
@@ -490,7 +585,8 @@ breushpagan = renamed_alias(breusch_pagan, 'breushpagan')
 # 분산팽창지수 반환 함수
 def vif(model: statsmodels.api.OLS) -> pd.DataFrame:
     """
-    이 함수는 입력변수 행렬의 분산팽창지수를 계산합니다.
+    이 함수는 입력변수 행렬의 분산팽창지수를 계산합니다. 모델에 상수항이
+    있으면 상수항은 제외합니다.
 
     매개변수:
         model: statsmodels.formula.api 모듈 함수로 적합한 회귀 모델을
@@ -500,39 +596,63 @@ def vif(model: statsmodels.api.OLS) -> pd.DataFrame:
         입력변수 행렬의 열별 분산팽창지수를 반환합니다.
     """
     func = oi.variance_inflation_factor
-    ncol = len(model.model.exog_names)
-    vifs = [func(exog=model.model.exog, exog_idx=i) for i in range(1, ncol)]
-    result = pd.DataFrame(data=vifs, index=model.model.exog_names[1:]).T
+    exog = model.model.exog
+    names = model.model.exog_names
+
+    # 상수항은 열 이름 대신 statsmodels가 판별한 위치로 제외
+    const_idx = model.model.data.const_idx
+    indices = [i for i in range(len(names)) if i != const_idx]
+
+    vifs = [func(exog=exog, exog_idx=i) for i in indices]
+    result = pd.DataFrame(data=vifs, index=[names[i] for i in indices]).T
 
     return result
 
 
 # 회귀계수 반환 함수
-def coefs(model: statsmodels.api.OLS) -> pd.Series:
+def coefs(model: object) -> pd.Series:
     """
     이 함수는 회귀 모델의 회귀계수를 확인합니다.
 
     매개변수:
-        model: statsmodels.formula.api.ols 함수로 적합한 선형 회귀 모델을
-            지정합니다.
+        model: statsmodels로 적합한 회귀 모델 또는 coef_ 속성이 있는
+            scikit-learn 모델을 지정합니다.
 
     반환:
-        회귀 모델의 회귀계수를 반환합니다.
+        회귀 모델의 회귀계수를 pd.Series로 반환합니다. statsmodels 모델은
+        상수항을 포함하고, scikit-learn 모델은 상수항(intercept_)을
+        제외합니다. scikit-learn 모델의 회귀계수가 여러 행이면(다중 분류 등)
+        행이 범주인 데이터프레임을 반환합니다.
     """
-    if model.coef_.ndim == 1:
-        coefs = pd.Series(
-            data=model.coef_,
-            index=model.feature_names_in_,
-        )
-    elif model.coef_.ndim == 2:
-        coefs = pd.Series(
-            data=model.coef_[0],
-            index=model.feature_names_in_,
-        )
-    else:
-        coefs = pd.Series()
+    # statsmodels 모델
+    if hasattr(model, 'params'):
+        params = model.params
+        if isinstance(params, (pd.Series, pd.DataFrame)):
+            return params.copy()
+        return pd.Series(data=params, index=model.model.exog_names)
 
-    return coefs
+    # scikit-learn 모델
+    if hasattr(model, 'coef_'):
+        coef = np.asarray(model.coef_)
+        names = getattr(model, 'feature_names_in_', None)
+        if names is None:
+            names = [f'x{i}' for i in range(coef.shape[-1])]
+
+        if coef.ndim == 1:
+            return pd.Series(data=coef, index=names)
+        if coef.shape[0] == 1:
+            return pd.Series(data=coef[0], index=names)
+
+        return pd.DataFrame(
+            data=coef,
+            index=getattr(model, 'classes_', None),
+            columns=names,
+        )
+
+    raise TypeError(
+        f'{type(model).__name__} 모델은 지원하지 않습니다. statsmodels로 '
+        '적합한 모델 또는 coef_ 속성이 있는 scikit-learn 모델을 지정하세요.'
+    )
 
 
 # 표준화된 회귀계수 반환 함수
@@ -541,24 +661,30 @@ def std_coefs(model: statsmodels.api.OLS) -> pd.Series:
     이 함수는 회귀 모델의 표준화된 회귀계수를 계산합니다.
 
     매개변수:
-        model: statsmodels.formula.api 모듈 함수로 적합한 회귀 모델을
-            지정합니다.
+        model: statsmodels의 OLS 또는 GLM으로 적합한 회귀 모델을 지정합니다.
 
     반환:
-        회귀 모델의 표준화된 회귀계수를 반환합니다.
+        회귀 모델의 표준화된 회귀계수를 반환합니다. GLM 모델은 입력변수만
+        표준화하므로 입력변수가 1 표준편차 증가할 때 선형 예측값(로지스틱
+        회귀는 로그 오즈)의 변화량을 반환합니다.
     """
-    model_type = str(type(model.model))
+    fitted_model = getattr(model, 'model', None)
+
+    if not isinstance(fitted_model, (sma.OLS, sma.GLM)):
+        raise TypeError(
+            f'{type(model).__name__} 모델은 지원하지 않습니다. '
+            'statsmodels의 OLS 또는 GLM으로 적합한 모델을 지정하세요.'
+        )
 
     X = pd.DataFrame(
         data=model.model.exog,
         columns=model.model.exog_names,
     )
 
-    if 'OLS' in model_type:
+    if isinstance(fitted_model, sma.OLS):
         y = model.model.endog
         result = model.params * (X.std() / y.std())
-    elif 'GLM' in model_type:
-        y = 1
+    else:
         result = model.params * (X.std() / 1)
 
     return result
@@ -628,17 +754,20 @@ regmetrics = renamed_alias(reg_metrics, 'regmetrics')
 # 로지스틱 회귀 모델을 적합하는 함수
 def glm(y: pd.Series, X: pd.DataFrame) -> statsmodels.api.GLM:
     """
-    이 함수는 로지스틱 회귀 모델을 적합합니다.
+    이 함수는 이항분포와 로짓 연결함수를 사용하는 GLM으로 로지스틱 회귀
+    모델을 적합합니다. 입력변수 행렬에 'const' 열이 없으면 상수항을
+    추가하며, 원본 입력변수 행렬은 변경하지 않습니다.
 
     매개변수:
-        y: 목표변수 벡터를 pd.Series 또는 1차원 np.ndarray로 지정합니다.
+        y: 목표변수 벡터를 0과 1로 이루어진 pd.Series 또는 1차원
+            np.ndarray로 지정합니다.
         X: 입력변수 행렬을 pd.DataFrame 또는 2차원 np.ndarray로 지정합니다.
+            np.ndarray의 열 이름은 x1, x2, ... 순서로 지정합니다.
 
     반환:
         로지스틱 회귀 모델을 반환합니다.
     """
-    if 'const' not in X.columns:
-        X.insert(loc=0, column='const', value=1)
+    X = _add_const(X=X, index=y.index if isinstance(y, pd.Series) else None)
 
     model = sma.GLM(endog=y, exog=X, family=sma.families.Binomial())
 
@@ -713,6 +842,7 @@ clfmetrics = renamed_alias(clf_metrics, 'clfmetrics')
 def clf_cutoffs(
     y_true: np.ndarray,
     y_prob: np.ndarray,
+    pos_label: str | int = None,
 ) -> pd.DataFrame:
     """
     이 함수는 분류 모델에 대한 최적의 분류 기준점을 탐색합니다.
@@ -720,12 +850,27 @@ def clf_cutoffs(
     매개변수:
         y_true: 목표변수의 실제값을 pd.Series 또는 1차원 np.ndarray로
             지정합니다.
-        y_prob: 목표변수의 예측 확률을 pd.Series 또는 1차원 np.ndarray로
-            지정합니다.
+        y_prob: 목표변수의 예측 확률을 지정합니다. 양성 범주의 확률을 담은
+            1차원 np.ndarray 또는 predict_proba() 함수가 반환한 2차원
+            np.ndarray를 지정할 수 있습니다.
+        pos_label: 양성 범주를 지정합니다. 생략하면 목표변수의 범주가 0과
+            1이면 1, False와 True이면 True를 양성 범주로 사용하며, 그 밖의
+            범주는 반드시 지정해야 합니다.(기본값: None)
 
     반환:
         분류 모델의 분류 기준점별로 TPR, FPR, MCC 등을 반환합니다.
     """
+    pos_label = resolve_pos_label(y_true=y_true, pos_label=pos_label)
+    y_prob = pos_proba(y_true=y_true, y_prob=y_prob, pos_label=pos_label)
+
+    # 실제값을 양성 범주 여부로 변환
+    actual = (
+        pd.Series(data=y_true)
+        .eq(other=pos_label)
+        .fillna(value=False)
+        .to_numpy(dtype=bool)
+    )
+
     cutoffs = np.linspace(0, 1, 101)
     sens = []
     spec = []
@@ -733,18 +878,19 @@ def clf_cutoffs(
     mccs = []
 
     for cutoff in cutoffs:
-        pred = np.where(y_prob >= cutoff, 1, 0)
-        report = metrics.classification_report(
-            y_true=y_true,
-            y_pred=pred,
-            output_dict=True,
-            zero_division=True,
-        )
-        sens.append(report['1']['recall'])
-        spec.append(report['0']['recall'])
-        prec.append(report['1']['precision'])
+        pred = y_prob >= cutoff
 
-        mcc = metrics.matthews_corrcoef(y_true=y_true, y_pred=pred)
+        tp = np.sum(actual & pred)
+        fn = np.sum(actual & ~pred)
+        fp = np.sum(~actual & pred)
+        tn = np.sum(~actual & ~pred)
+
+        # 분모가 0이면 classification_report(zero_division=True)처럼 1로 처리
+        sens.append(tp / (tp + fn) if tp + fn > 0 else 1.0)
+        spec.append(tn / (tn + fp) if tn + fp > 0 else 1.0)
+        prec.append(tp / (tp + fp) if tp + fp > 0 else 1.0)
+
+        mcc = metrics.matthews_corrcoef(y_true=actual, y_pred=pred)
         mccs.append(mcc)
 
     result = pd.DataFrame(
@@ -781,6 +927,7 @@ def epi_roc(
     y_true: np.ndarray,
     y_prob: np.ndarray,
     ax: plt.Axes = None,
+    pos_label: str | int = None,
 ) -> plt.Axes:
     """
     이 함수는 'hds.plot.roc_cutoff' 함수의 이전 이름이며 동작이 같습니다.
@@ -794,6 +941,9 @@ def epi_roc(
             지정합니다.
         ax: 그래프를 그릴 matplotlib Axes 객체를 지정합니다. 생략하면 현재
             Axes에 그립니다.(기본값: None)
+        pos_label: 양성 범주를 지정합니다. 생략하면 목표변수의 범주가 0과
+            1이면 1, False와 True이면 True를 양성 범주로 사용하며, 그 밖의
+            범주는 반드시 지정해야 합니다.(기본값: None)
 
     반환:
         그래프를 그린 matplotlib Axes 객체를 반환합니다.
@@ -801,7 +951,7 @@ def epi_roc(
     # 순환 참조를 피하려고 함수 안에서 호출
     from hds.plot import roc_cutoff
 
-    return roc_cutoff(y_true=y_true, y_prob=y_prob, ax=ax)
+    return roc_cutoff(y_true=y_true, y_prob=y_prob, ax=ax, pos_label=pos_label)
 
 
 # End of Document

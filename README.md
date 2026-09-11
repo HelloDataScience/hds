@@ -191,6 +191,38 @@ stat.regression_diagnosis(model)  # 잔차 진단 그래프 4종
 
 ---
 
+## 변경 사항 (0.4.0, 개발 중)
+
+아직 PyPI에 배포하지 않은 변경입니다.
+
+- **양성 범주 기본값을 바로잡았습니다.** `plot.roc_curve()`, `plot.pr_curve()`,
+  `plot.roc_cutoff()`, `stat.clf_cutoffs()`는 `pos_label`을 생략하면 목표변수의
+  범주가 0과 1이면 1, False와 True이면 True를 양성 범주로 사용합니다. 이전에는
+  도수가 적은 범주를 양성으로 골라서, 1이 다수 범주인 데이터에서 AUC·AP가
+  의도와 다르게 계산될 수 있었습니다. 문자열 범주는 양성 범주를 추측하지
+  않으므로 `pos_label`을 지정해야 합니다.
+
+  ```python
+  plot.roc_curve(y_true=y_valid, y_prob=y_prob, pos_label='Pass')
+  ```
+
+- `stat.clf_cutoffs()`와 `plot.roc_cutoff()`가 0과 1 외의 이진 범주(실수,
+  불리언, 문자열)와 `predict_proba()`가 반환한 2차원 확률을 받습니다.
+- `stat.ols()`, `stat.glm()`, `stat.hat_matrix()`, `stat.leverage()`가 원본
+  `X`에 `const` 열을 추가하지 않습니다. 2차원 `np.ndarray`도 받으며, 열 이름은
+  `x1`, `x2`, ... 순서로 지정합니다.
+- `stat.coefs()`가 statsmodels 모델(상수항 포함)과 scikit-learn 모델을 모두
+  받습니다. 지원하지 않는 모델을 지정하면 `TypeError`가 발생합니다.
+- `stat.std_resid()`가 원래 관측값의 인덱스를 유지합니다.
+- `stat.vif()`가 상수항을 열 이름이 아닌 실제 위치로 판별하므로, 상수항이 없는
+  모델에서 첫 번째 입력변수가 빠지지 않습니다.
+- `stat.std_coefs()`는 OLS·GLM이 아닌 모델에 `TypeError`를, `stat.stepwise()`는
+  잘못된 `direction`에 `ValueError`를 발생시킵니다.
+- 변수선택법의 결과가 실행할 때마다 같은 변수 순서로 나오고, 공백이 있는 열
+  이름도 처리합니다.
+
+---
+
 ## 변경 사항 (0.3.5)
 
 - `plot.tree()`가 png 파일 외에는 어떤 파일도 만들지 않습니다. 0.3.4까지는
@@ -254,7 +286,7 @@ coef_path(X, y, model='lasso', alphas=None, l1_ratio=0.5, standardize=True,
           alpha=None, palette='Spectral', legend=True, ax=None) -> plt.Axes
 roc_curve(y_true, y_prob, pos_label=None, color=None,
           label=None, ax=None) -> plt.Axes
-roc_cutoff(y_true, y_prob, ax=None) -> plt.Axes
+roc_cutoff(y_true, y_prob, ax=None, pos_label=None) -> plt.Axes
 tree(model, file_name=None, class_name=None, path=None) -> None
 
 # hds.stat
@@ -265,7 +297,7 @@ regression_diagnosis(model) -> None
 vif(model) -> pd.DataFrame
 reg_metrics(y_true, y_pred) -> pd.DataFrame
 clf_metrics(y_true, y_pred) -> None
-clf_cutoffs(y_true, y_prob) -> pd.DataFrame
+clf_cutoffs(y_true, y_prob, pos_label=None) -> pd.DataFrame
 ```
 
 ### 규제 회귀 계수 경로 예시
