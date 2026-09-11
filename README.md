@@ -193,6 +193,19 @@ fig, axes = stat.regression_diagnosis(model)  # 잔차 진단 그래프 4종
 
 ---
 
+## 변경 사항 (0.5.0)
+
+- 0.3.0에서 남겨 두었던 이전 이름 `stat.regmetrics`, `stat.clfmetrics`,
+  `stat.breushpagan`을 없앴습니다. 각각 `stat.reg_metrics`,
+  `stat.clf_metrics`, `stat.breusch_pagan`으로 바꿔서 사용하세요.
+  `stat.epi_roc`는 `plot.roc_cutoff`와 함께 그대로 둡니다.
+- `stat.reg_metrics()`가 리스트와 object 자료형 입력도 실수로 변환해
+  계산합니다. pandas 3에서 빈 `pd.Series()`에 예측값을 이어 붙이면 object
+  자료형이 되는데, 이전에는 MSLE를 계산할 때 `TypeError`가 발생했습니다.
+  실제값과 추정값의 길이가 다르면 `ValueError`가 발생합니다.
+
+---
+
 ## 변경 사항 (0.4.3)
 
 - `stat.regression_diagnosis()`의 정규 Q-Q 그래프에서 기준선(y = x)을 이론상
@@ -331,15 +344,15 @@ fig, axes = stat.regression_diagnosis(model)  # 잔차 진단 그래프 4종
 ## 함수명 변경 (0.3.0)
 
 `snake_case`로 이름을 통일하고, 그래프를 그리는 함수는 `plot` 모듈로
-옮겼습니다. 이전 이름은 경고 없이 그대로 동작하므로 기존 코드를 고치지 않아도
-됩니다. 새로 작성하는 코드에서는 새 이름을 사용하세요.
+옮겼습니다. 0.4.3까지는 이전 이름도 경고 없이 동작했지만, 0.5.0에서 아래 표의
+이전 이름 세 개를 없앴습니다. `stat.epi_roc`는 그대로 사용할 수 있습니다.
 
-| 이전 이름 | 새 이름 |
-| --- | --- |
-| `stat.regmetrics` | `stat.reg_metrics` |
-| `stat.clfmetrics` | `stat.clf_metrics` |
-| `stat.breushpagan` | `stat.breusch_pagan` (철자 교정) |
-| `stat.epi_roc` | `plot.roc_cutoff` |
+| 이전 이름 | 새 이름 | 0.5.0 |
+| --- | --- | --- |
+| `stat.regmetrics` | `stat.reg_metrics` | 제거 |
+| `stat.clfmetrics` | `stat.clf_metrics` | 제거 |
+| `stat.breushpagan` | `stat.breusch_pagan` (철자 교정) | 제거 |
+| `stat.epi_roc` | `plot.roc_cutoff` | 유지 |
 
 ---
 

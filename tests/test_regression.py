@@ -252,6 +252,33 @@ def test_stepwise_result_does_not_depend_on_hash_seed():
     assert len(set(outputs)) == 1
 
 
+# reg_metrics()
+def test_reg_metrics_accepts_object_dtype_and_list(reg_data):
+    y, X = reg_data
+    y_pred = stat.ols(y=y, X=X).fittedvalues
+    expected = stat.reg_metrics(y_true=y, y_pred=y_pred)
+
+    # pandas 3에서는 빈 Series에 이어 붙이면 object 자료형이 됨
+    object_pred = pd.concat(objs=[pd.Series(), y_pred])
+    assert object_pred.dtype == object
+
+    pd.testing.assert_frame_equal(
+        stat.reg_metrics(y_true=y, y_pred=object_pred),
+        expected,
+    )
+    pd.testing.assert_frame_equal(
+        stat.reg_metrics(y_true=y.tolist(), y_pred=y_pred.tolist()),
+        expected,
+    )
+
+
+def test_reg_metrics_rejects_different_lengths(reg_data):
+    y, X = reg_data
+    y_pred = stat.ols(y=y, X=X).fittedvalues
+    with pytest.raises(ValueError):
+        stat.reg_metrics(y_true=y, y_pred=y_pred[:-1])
+
+
 # ols_table(), logit_table()
 def test_ols_table_matches_model(reg_data):
     y, X = reg_data

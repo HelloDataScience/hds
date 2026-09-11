@@ -166,10 +166,22 @@ def test_clf_metrics_display(clf_data):
     assert '▶ Classification Report' in html_text
 
 
-def test_clf_metrics_old_name_with_string_labels(clf_data):
+def test_clf_metrics_with_string_labels(clf_data):
     y, proba = clf_data
     labels = y.map({0: 'N', 1: 'Y'})
     y_pred = pd.Series(data=np.where(proba[:, 1] >= 0.5, 'Y', 'N'))
-    result = stat.clfmetrics(y_true=labels, y_pred=y_pred)
+    result = stat.clf_metrics(y_true=labels, y_pred=y_pred)
     expected = ['True_N', 'True_Y', 'True_All']
     assert list(result.confusion_matrix.index) == expected
+
+
+# 0.5.0에서 없앤 이전 이름과 그대로 두는 이름
+@pytest.mark.parametrize('name', ['regmetrics', 'clfmetrics', 'breushpagan'])
+def test_old_names_are_removed(name):
+    assert not hasattr(stat, name)
+
+
+def test_epi_roc_is_kept(clf_data):
+    y, proba = clf_data
+    ax = stat.epi_roc(y_true=y, y_prob=proba)
+    assert ax.get_title() == '최적의 분류 기준점 탐색'
