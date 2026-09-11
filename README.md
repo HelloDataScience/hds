@@ -193,9 +193,7 @@ fig, axes = stat.regression_diagnosis(model)  # 잔차 진단 그래프 4종
 
 ---
 
-## 변경 사항 (0.4.2, 개발 중)
-
-아직 PyPI에 배포하지 않은 변경입니다.
+## 변경 사항 (0.4.2)
 
 - `stat.regression_diagnosis()`의 정규 Q-Q 그래프와 Scale-Location 그래프,
   `stat.std_resid()`가 z-score 대신 내부 학생화 잔차(잔차 ÷ (잔차 표준오차 ×
