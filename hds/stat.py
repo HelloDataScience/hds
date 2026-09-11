@@ -20,6 +20,46 @@ from hds._utils import (
     resolve_pos_label,
 )
 
+# 이 모듈에서 공개하는 이름 목록
+__all__ = [
+    'ols',
+    'forward_selection',
+    'backward_selection',
+    'stepwise_selection',
+    'stepwise',
+    'regression_diagnosis',
+    'cooks_distance',
+    'hat_matrix',
+    'leverage',
+    'std_resid',
+    'augment',
+    'breusch_pagan',
+    'vif',
+    'coefs',
+    'std_coefs',
+    'ols_table',
+    'reg_metrics',
+    'glm',
+    'logit_table',
+    'ClfMetrics',
+    'clf_metrics',
+    'cutoff_table',
+    'epi_roc',
+]
+
+
+# 모듈에서 공개하는 이름만 반환하는 함수
+def __dir__() -> list:
+    """
+    이 함수는 dir() 함수와 자동 완성 목록에 hds 함수만 보이도록 합니다.
+    numpy, statsmodels처럼 이 모듈이 불러온 외부 이름은 목록에서
+    제외합니다.
+
+    반환값:
+        공개하는 이름을 정렬한 리스트로 반환합니다.
+    """
+    return sorted(__all__)
+
 
 # 입력변수 행렬의 복사본에 상수항을 추가하는 함수
 def _add_const(X: pd.DataFrame, index: pd.Index = None) -> pd.DataFrame:
@@ -1011,14 +1051,15 @@ def clf_metrics(y_true: np.ndarray, y_pred: np.ndarray) -> ClfMetrics:
     )
 
 
-# 분류 모델의 분류 기준점별 성능 지표 계산(TPR, FPR, MCC)
-def clf_cutoffs(
+# 분류 모델의 분류 기준점별 성능 지표 표 반환 함수(TPR, FPR, MCC)
+def cutoff_table(
     y_true: np.ndarray,
     y_prob: np.ndarray,
     pos_label: str | int = None,
 ) -> pd.DataFrame:
     """
-    이 함수는 분류 모델에 대한 최적의 분류 기준점을 탐색합니다.
+    이 함수는 분류 기준점별 성능 지표를 표로 정리합니다. 최적의 분류 기준점을
+    그래프로 확인하려면 plot.roc_cutoff() 함수를 사용하세요.
 
     매개변수:
         y_true: 목표변수의 실제값을 pd.Series 또는 1차원 np.ndarray로

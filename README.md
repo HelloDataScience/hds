@@ -189,7 +189,22 @@ fig, axes = stat.regression_diagnosis(model)  # 잔차 진단 그래프 4종
 | `coefs` / `std_coefs` | 회귀계수 / 표준화 회귀계수 |
 | `ols_table` / `logit_table` | 회귀계수 검정표 / 회귀계수 검정표와 오즈비 |
 | `reg_metrics` / `clf_metrics` | 회귀 / 분류 성능 지표 |
-| `clf_cutoffs` | 최적 분류 기준점 탐색(표) |
+| `cutoff_table` | 분류 기준점별 성능 지표(표) |
+
+---
+
+## 변경 사항 (0.5.1)
+
+- **`stat.clf_cutoffs()`의 이름을 `stat.cutoff_table()`로 바꿨습니다.**
+  이름만 보고 `plot.roc_cutoff()`와 헷갈리기 쉬워서, 표를 반환하는 함수는
+  `ols_table()`·`logit_table()`과 같은 `_table` 계열로 통일했습니다. 이전
+  이름은 남기지 않았으므로 `stat.cutoff_table()`로 바꿔서 사용하세요.
+  기준점을 그래프로 확인하는 `plot.roc_cutoff()`와 그 예전 이름
+  `stat.epi_roc()`는 그대로입니다.
+- `hds.plot`과 `hds.stat`에 `__all__`을 정의해 공개하는 이름을 명시했습니다.
+  `dir(hds.stat)`과 자동 완성 목록에 hds 함수만 나타나며, 모듈이 내부에서
+  불러온 `np`, `pd`, `plt`, `metrics`, `RegressionModel` 같은 이름은 목록에서
+  빠집니다. 이름을 감췄을 뿐이므로 기존 코드의 동작은 그대로입니다.
 
 ---
 
@@ -384,7 +399,7 @@ regression_diagnosis(model) -> (plt.Figure, np.ndarray)
 vif(model) -> pd.DataFrame
 reg_metrics(y_true, y_pred) -> pd.DataFrame
 clf_metrics(y_true, y_pred) -> ClfMetrics
-clf_cutoffs(y_true, y_prob, pos_label=None) -> pd.DataFrame
+cutoff_table(y_true, y_prob, pos_label=None) -> pd.DataFrame
 ```
 
 ### 규제 회귀 계수 경로 예시
