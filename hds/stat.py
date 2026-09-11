@@ -379,8 +379,8 @@ def regression_diagnosis(model: statsmodels.api.OLS) -> tuple:
         ax=ax2,
     )
 
-    # 기준선을 데이터 범위에 맞춰 추가
-    lims = [min(x.min(), y.min()), max(x.max(), y.max())]
+    # 기준선(y = x)을 이론상 분위수 범위에 맞춰 추가
+    lims = [x.min(), x.max()]
     ax2.plot(lims, lims, color='0.5', linestyle='--', linewidth=1)
 
     ax2.set_title(

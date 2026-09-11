@@ -193,6 +193,14 @@ fig, axes = stat.regression_diagnosis(model)  # 잔차 진단 그래프 4종
 
 ---
 
+## 변경 사항 (0.4.3)
+
+- `stat.regression_diagnosis()`의 정규 Q-Q 그래프에서 기준선(y = x)을 이론상
+  분위수 범위에만 그립니다. 0.4.0~0.4.2에서는 표준화 잔차가 이론상 분위수보다
+  멀리 떨어지면 기준선이 그만큼 길어져 가로축이 한쪽으로 늘어났습니다.
+
+---
+
 ## 변경 사항 (0.4.2)
 
 - `stat.regression_diagnosis()`의 정규 Q-Q 그래프와 Scale-Location 그래프,
