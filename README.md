@@ -193,9 +193,12 @@ fig, axes = stat.regression_diagnosis(model)  # 잔차 진단 그래프 4종
 
 ---
 
-## 변경 사항 (0.4.0, 개발 중)
+## 변경 사항 (0.4.0)
 
-아직 PyPI에 배포하지 않은 변경입니다.
+계산 오류를 바로잡고, 결과를 변수에 담아 다시 쓸 수 있도록 반환 형식을
+정리했습니다. 기존 코드에서 달라질 수 있는 부분은 문자열 목표변수의
+`pos_label` 지정, 파이썬 스크립트에서 `clf_metrics()` 결과의 `print()`,
+`regression_diagnosis()` 반환값 출력입니다.
 
 - **양성 범주 기본값을 바로잡았습니다.** `plot.roc_curve()`, `plot.pr_curve()`,
   `plot.roc_cutoff()`, `stat.clf_cutoffs()`는 `pos_label`을 생략하면 목표변수의
@@ -258,6 +261,9 @@ fig, axes = stat.regression_diagnosis(model)  # 잔차 진단 그래프 4종
   stat.logit_table(stat.glm(y=y, X=X))
   # coef, std_err, z, p_value, odds_ratio, or_ci_lower, or_ci_upper
   ```
+
+- Python 3.11 이상이 필요합니다. Python 3.10에서는 `pip install hds`가
+  0.3.5를 설치합니다.
 
 ---
 
@@ -359,7 +365,7 @@ plot.coef_path(X=X_train, y=y_train, model='lasso', alpha=model_cv.alpha_)
 
 ## 의존성 (Requirements)
 
-- Python >= 3.10
+- Python >= 3.11
 - **필수**: numpy, pandas, scipy, matplotlib, seaborn(>=0.13),
   statsmodels, scikit-learn(>=1.4)
 - **선택**: graphviz(`tree`), requests·beautifulsoup4(`font`),
