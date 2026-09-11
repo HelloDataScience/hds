@@ -8,7 +8,7 @@ from hds import stat
 from hds._utils import pos_proba, resolve_pos_label
 
 
-# 0.3.5의 clf_cutoffs() 계산 방식(0과 1 범주 전용)
+# 0.3.5의 cutoff_table() 계산 방식(0과 1 범주 전용)
 def reference_cutoffs(y_true, y_prob):
     rows = []
     for cutoff in np.linspace(0, 1, 101):
@@ -70,10 +70,10 @@ def test_pos_proba_rejects_column_mismatch(clf_data):
         pos_proba(y_true=y, y_prob=extra, pos_label=1)
 
 
-# clf_cutoffs()
-def test_clf_cutoffs_matches_reference(clf_data):
+# cutoff_table()
+def test_cutoff_table_matches_reference(clf_data):
     y, proba = clf_data
-    result = stat.clf_cutoffs(y_true=y, y_prob=proba[:, 1])
+    result = stat.cutoff_table(y_true=y, y_prob=proba[:, 1])
     expected = reference_cutoffs(y_true=y, y_prob=proba[:, 1])
 
     for col in expected.columns:
@@ -84,9 +84,9 @@ def test_clf_cutoffs_matches_reference(clf_data):
 
 
 @pytest.mark.parametrize('kind', ['float', 'bool', 'str', 'string'])
-def test_clf_cutoffs_supports_binary_labels(clf_data, kind):
+def test_cutoff_table_supports_binary_labels(clf_data, kind):
     y, proba = clf_data
-    expected = stat.clf_cutoffs(y_true=y, y_prob=proba[:, 1])
+    expected = stat.cutoff_table(y_true=y, y_prob=proba[:, 1])
     labels = y.map({0: 'N', 1: 'Y'})
 
     if kind == 'float':
@@ -98,14 +98,18 @@ def test_clf_cutoffs_supports_binary_labels(clf_data, kind):
     else:
         y_true, pos_label = labels.astype('string'), 'Y'
 
-    result = stat.clf_cutoffs(y_true=y_true, y_prob=proba, pos_label=pos_label)
+    result = stat.cutoff_table(
+        y_true=y_true,
+        y_prob=proba,
+        pos_label=pos_label,
+    )
     pd.testing.assert_frame_equal(result, expected)
 
 
-def test_clf_cutoffs_requires_pos_label_for_strings(clf_data):
+def test_cutoff_table_requires_pos_label_for_strings(clf_data):
     y, proba = clf_data
     with pytest.raises(ValueError, match='pos_label'):
-        stat.clf_cutoffs(y_true=y.map({0: 'N', 1: 'Y'}), y_prob=proba)
+        stat.cutoff_table(y_true=y.map({0: 'N', 1: 'Y'}), y_prob=proba)
 
 
 # clf_metrics()
@@ -175,8 +179,11 @@ def test_clf_metrics_with_string_labels(clf_data):
     assert list(result.confusion_matrix.index) == expected
 
 
-# 0.5.0에서 없앤 이전 이름과 그대로 두는 이름
-@pytest.mark.parametrize('name', ['regmetrics', 'clfmetrics', 'breushpagan'])
+# 0.5.0과 0.5.1에서 없앤 이전 이름과 그대로 두는 이름
+@pytest.mark.parametrize(
+    'name',
+    ['regmetrics', 'clfmetrics', 'breushpagan', 'clf_cutoffs'],
+)
 def test_old_names_are_removed(name):
     assert not hasattr(stat, name)
 

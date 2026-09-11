@@ -30,6 +30,47 @@ from hds._utils import (
     try_import,
 )
 
+# 이 모듈에서 공개하는 이름 목록
+__all__ = [
+    'search_google_font_file',
+    'download_google_font_file',
+    'install_google_font_path',
+    'add_google_font',
+    'remove_legend',
+    'box_group',
+    'scatter',
+    'regline',
+    'bar_freq',
+    'bar_dodge_freq',
+    'bar_stack_freq',
+    'bar_stack_prop',
+    'corr_heatmap',
+    'kde2d',
+    'tree',
+    'feature_importance',
+    'coef_path',
+    'step',
+    'roc_curve',
+    'pr_curve',
+    'roc_cutoff',
+    'screeplot',
+    'biplot',
+    'wcss',
+    'silhouette',
+]
+
+
+# 모듈에서 공개하는 이름만 반환하는 함수
+def __dir__() -> list:
+    """
+    이 함수는 dir() 함수와 자동 완성 목록에 hds 함수만 보이도록 합니다.
+    numpy, pandas처럼 이 모듈이 불러온 외부 이름은 목록에서 제외합니다.
+
+    반환값:
+        공개하는 이름을 정렬한 리스트로 반환합니다.
+    """
+    return sorted(__all__)
+
 
 # 그래프를 그릴 Axes를 준비하는 함수
 def _prepare_ax(ax: plt.Axes) -> plt.Axes:
@@ -1339,11 +1380,11 @@ def roc_cutoff(
         그래프를 그린 matplotlib Axes 객체를 반환합니다.
     """
     # 순환 참조를 피하려고 함수 안에서 호출
-    from hds.stat import clf_cutoffs
+    from hds.stat import cutoff_table
 
     ax = _prepare_ax(ax)
 
-    cutoff_df = clf_cutoffs(
+    cutoff_df = cutoff_table(
         y_true=y_true,
         y_prob=y_prob,
         pos_label=pos_label,
