@@ -1,5 +1,4 @@
 # 관련 라이브러리 호출
-import functools
 import importlib
 from types import ModuleType
 
@@ -57,36 +56,6 @@ def try_import(module: str) -> ModuleType:
         return importlib.import_module(name=module)
     except ImportError:
         return None
-
-
-# 이름을 바꾼 함수의 하위 호환 별칭을 생성하는 함수
-def renamed_alias(func, old_name: str):
-    """
-    이 함수는 이름을 바꾼 함수의 하위 호환 별칭을 생성합니다. 별칭은 경고
-    없이 새로운 함수를 그대로 실행하며, 도움말에만 새로운 함수명을
-    안내합니다.
-
-    매개변수:
-        func: 새로운 이름의 함수를 지정합니다.
-        old_name: 이전 함수명을 문자열로 지정합니다.
-
-    반환값:
-        이전 함수명으로 사용할 수 있는 함수를 반환합니다.
-    """
-    new_name = func.__name__
-
-    @functools.wraps(func)
-    def wrapper(*args, **kwargs):
-        return func(*args, **kwargs)
-
-    wrapper.__name__ = old_name
-    wrapper.__qualname__ = old_name
-    wrapper.__doc__ = (
-        f"이 함수는 '{new_name}' 함수의 이전 이름이며 동작이 같습니다. "
-        f"새로 작성하는 코드에서는 '{new_name}' 함수를 사용하세요."
-        f"\n\n{func.__doc__}"
-    )
-    return wrapper
 
 
 # 입력변수 행렬을 원본과 분리된 데이터프레임으로 변환하는 함수

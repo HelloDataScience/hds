@@ -17,7 +17,6 @@ from statsmodels.regression.linear_model import RegressionModel
 from hds._utils import (
     as_frame,
     pos_proba,
-    renamed_alias,
     resolve_pos_label,
 )
 
@@ -582,10 +581,6 @@ def breusch_pagan(model: statsmodels.api.OLS) -> pd.DataFrame:
     return result
 
 
-# 잔차의 등분산성 검정 함수(이전 이름)
-breushpagan = renamed_alias(breusch_pagan, 'breushpagan')
-
-
 # 분산팽창지수 반환 함수
 def vif(model: statsmodels.api.OLS) -> pd.DataFrame:
     """
@@ -771,16 +766,26 @@ def reg_metrics(y_true: np.ndarray, y_pred: np.ndarray) -> pd.DataFrame:
     이 함수는 회귀 모델의 다양한 성능 지표를 계산합니다.
 
     매개변수:
-        y_true: 목표변수의 실제값을 pd.Series 또는 1차원 np.ndarray로
-            지정합니다.
-        y_pred: 목표변수의 추정값을 pd.Series 또는 1차원 np.ndarray로
-            지정합니다.
+        y_true: 목표변수의 실제값을 pd.Series, 1차원 np.ndarray 또는
+            리스트로 지정합니다.
+        y_pred: 목표변수의 추정값을 pd.Series, 1차원 np.ndarray 또는
+            리스트로 지정합니다.
 
     반환:
         회귀 모델의 다양한 성능 지표를 데이터프레임으로 반환합니다.
         실제값과 추정값 중 음수가 포함되면 MSLE와 RMSLE는 결측값으로
         처리합니다.
     """
+    # 리스트나 object 자료형으로 지정해도 계산할 수 있도록 실수로 변환
+    y_true = np.asarray(a=y_true, dtype=float)
+    y_pred = np.asarray(a=y_pred, dtype=float)
+
+    if y_true.shape != y_pred.shape:
+        raise ValueError(
+            'y_true와 y_pred의 형태가 다릅니다.'
+            f'({y_true.shape} != {y_pred.shape})'
+        )
+
     R_2 = metrics.r2_score(y_true=y_true, y_pred=y_pred)
     MSE = metrics.mean_squared_error(y_true=y_true, y_pred=y_pred)
     RMSE = metrics.root_mean_squared_error(y_true=y_true, y_pred=y_pred)
@@ -820,10 +825,6 @@ def reg_metrics(y_true: np.ndarray, y_pred: np.ndarray) -> pd.DataFrame:
     )
 
     return result
-
-
-# 회귀 모델의 성능 지표 반환 함수(이전 이름)
-regmetrics = renamed_alias(reg_metrics, 'regmetrics')
 
 
 # 로지스틱 회귀 모델을 적합하는 함수
@@ -1008,10 +1009,6 @@ def clf_metrics(y_true: np.ndarray, y_pred: np.ndarray) -> ClfMetrics:
         classification_report=report,
         report_text=report_text,
     )
-
-
-# 분류 모델의 성능 지표 반환 함수(이전 이름)
-clfmetrics = renamed_alias(clf_metrics, 'clfmetrics')
 
 
 # 분류 모델의 분류 기준점별 성능 지표 계산(TPR, FPR, MCC)
