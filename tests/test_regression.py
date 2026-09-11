@@ -227,3 +227,110 @@ def test_stepwise_result_does_not_depend_on_hash_seed():
         outputs.append(completed.stdout)
 
     assert len(set(outputs)) == 1
+
+
+# ols_table(), logit_table()
+def test_ols_table_matches_model(reg_data):
+    y, X = reg_data
+    model = stat.ols(y=y, X=X)
+    table = stat.ols_table(model=model)
+
+    columns = ['coef', 'std_err', 't', 'p_value', 'ci_lower', 'ci_upper']
+    assert list(table.columns) == columns
+    assert list(table.index) == ['const', 'x1', 'x2', 'x3']
+
+    np.testing.assert_allclose(table['coef'], model.params)
+    np.testing.assert_allclose(table['std_err'], model.bse)
+    np.testing.assert_allclose(table['t'], model.tvalues)
+    np.testing.assert_allclose(table['p_value'], model.pvalues)
+    np.testing.assert_allclose(
+        table[['ci_lower', 'ci_upper']],
+        model.conf_int(alpha=0.05),
+    )
+
+
+def test_ols_table_alpha(reg_data):
+    y, X = reg_data
+    model = stat.ols(y=y, X=X)
+    table = stat.ols_table(model=model, alpha=0.1)
+    np.testing.assert_allclose(
+        table[['ci_lower', 'ci_upper']],
+        model.conf_int(alpha=0.1),
+    )
+
+
+def test_ols_table_formula_and_robust_models(reg_data):
+    y, X = reg_data
+    model = stat.stepwise(y=y, X=X, direction='forward')
+    assert stat.ols_table(model=model).index[0] == 'Intercept'
+
+    robust = sma.OLS(endog=y, exog=sma.add_constant(X)).fit(cov_type='HC3')
+    table = stat.ols_table(model=robust)
+    assert 'z' in table.columns
+    np.testing.assert_allclose(table['std_err'], robust.bse)
+
+
+def test_ols_table_rejects_other_models(logit_data):
+    y, X = logit_data
+    with pytest.raises(TypeError):
+        stat.ols_table(model=stat.glm(y=y, X=X))
+    with pytest.raises(TypeError):
+        stat.ols_table(model=LinearRegression().fit(X=X, y=y))
+
+
+@pytest.mark.parametrize('alpha', [0, 1, 1.5])
+def test_tables_reject_invalid_alpha(reg_data, logit_data, alpha):
+    y, X = reg_data
+    with pytest.raises(ValueError, match='alpha'):
+        stat.ols_table(model=stat.ols(y=y, X=X), alpha=alpha)
+
+    y, X = logit_data
+    with pytest.raises(ValueError, match='alpha'):
+        stat.logit_table(model=stat.glm(y=y, X=X), alpha=alpha)
+
+
+def test_logit_table_odds_ratio(logit_data):
+    y, X = logit_data
+    model = stat.glm(y=y, X=X)
+    table = stat.logit_table(model=model)
+    ci = model.conf_int(alpha=0.05)
+
+    columns = [
+        'coef', 'std_err', 'z', 'p_value',
+        'odds_ratio', 'or_ci_lower', 'or_ci_upper',
+    ]
+    assert list(table.columns) == columns
+    assert list(table.index) == ['const', 'x1', 'x2']
+
+    np.testing.assert_allclose(table['coef'], model.params)
+    np.testing.assert_allclose(table['p_value'], model.pvalues)
+    np.testing.assert_allclose(table['odds_ratio'], np.exp(model.params))
+    np.testing.assert_allclose(table['or_ci_lower'], np.exp(ci[0]))
+    np.testing.assert_allclose(table['or_ci_upper'], np.exp(ci[1]))
+
+
+def test_logit_table_accepts_statsmodels_logit(logit_data):
+    y, X = logit_data
+    expected = stat.logit_table(model=stat.glm(y=y, X=X))
+    model = sma.Logit(endog=y, exog=sma.add_constant(X)).fit(disp=0)
+    table = stat.logit_table(model=model)
+    np.testing.assert_allclose(
+        table['odds_ratio'],
+        expected['odds_ratio'],
+        rtol=1e-4,
+    )
+
+
+def test_logit_table_rejects_other_models(reg_data, logit_data):
+    y, X = reg_data
+    with pytest.raises(TypeError):
+        stat.logit_table(model=stat.ols(y=y, X=X))
+
+    y, X = logit_data
+    poisson = sma.GLM(
+        endog=y,
+        exog=sma.add_constant(X),
+        family=sma.families.Poisson(),
+    ).fit()
+    with pytest.raises(TypeError):
+        stat.logit_table(model=poisson)

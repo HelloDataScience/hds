@@ -149,6 +149,7 @@ X = iris[['petal_length', 'sepal_length', 'sepal_width']]
 model = stat.ols(y=y, X=X)
 print(model.summary())
 
+stat.ols_table(model=model)                   # 회귀계수 검정표(계수·표준오차·t·p·신뢰구간)
 stat.vif(model=model)                         # 분산팽창지수(VIF)로 다중공선성 점검
 fig, axes = stat.regression_diagnosis(model)  # 잔차 진단 그래프 4종
 ```
@@ -186,6 +187,7 @@ fig, axes = stat.regression_diagnosis(model)  # 잔차 진단 그래프 4종
 | `vif` / `breusch_pagan` | 분산팽창지수 / 잔차 등분산성 검정 |
 | `cooks_distance` / `leverage` / `augment` | 영향점·레버리지 진단 |
 | `coefs` / `std_coefs` | 회귀계수 / 표준화 회귀계수 |
+| `ols_table` / `logit_table` | 회귀계수 검정표 / 회귀계수 검정표와 오즈비 |
 | `reg_metrics` / `clf_metrics` | 회귀 / 분류 성능 지표 |
 | `clf_cutoffs` | 최적 분류 기준점 탐색(표) |
 
@@ -242,6 +244,19 @@ fig, axes = stat.regression_diagnosis(model)  # 잔차 진단 그래프 4종
   ```python
   fig, axes = stat.regression_diagnosis(model)
   fig.savefig('diagnosis.png')
+  ```
+
+- 회귀계수 검정 결과를 표로 정리하는 `stat.ols_table()`과 `stat.logit_table()`을
+  추가했습니다. `logit_table()`은 `stat.glm()`으로 적합한 모델을 받아 오즈비와
+  오즈비 신뢰구간을 함께 계산합니다. `alpha`로 신뢰구간의 유의수준을 바꿀 수
+  있습니다.
+
+  ```python
+  stat.ols_table(stat.ols(y=y, X=X))
+  # coef, std_err, t, p_value, ci_lower, ci_upper
+
+  stat.logit_table(stat.glm(y=y, X=X))
+  # coef, std_err, z, p_value, odds_ratio, or_ci_lower, or_ci_upper
   ```
 
 ---
@@ -315,6 +330,8 @@ tree(model, file_name=None, class_name=None, path=None) -> None
 # hds.stat
 ols(y, X) -> statsmodels OLS
 glm(y, X) -> statsmodels GLM
+ols_table(model, alpha=0.05) -> pd.DataFrame
+logit_table(model, alpha=0.05) -> pd.DataFrame
 stepwise(y, X, direction='both') -> statsmodels OLS
 regression_diagnosis(model) -> (plt.Figure, np.ndarray)
 vif(model) -> pd.DataFrame

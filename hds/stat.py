@@ -12,6 +12,7 @@ import statsmodels.formula.api as smf
 import statsmodels.stats.outliers_influence as oi
 from scipy import stats
 from sklearn import metrics
+from statsmodels.regression.linear_model import RegressionModel
 
 from hds._utils import (
     as_frame,
@@ -690,6 +691,74 @@ def std_coefs(model: statsmodels.api.OLS) -> pd.Series:
     return result
 
 
+# 회귀 모델의 회귀계수 검정 결과를 표로 정리하는 함수
+def _coef_table(model: object, alpha: float) -> pd.DataFrame:
+    """
+    이 함수는 statsmodels로 적합한 회귀 모델의 회귀계수, 표준오차, 검정통계량,
+    유의확률과 신뢰구간을 데이터프레임으로 정리합니다.
+
+    매개변수:
+        model: statsmodels로 적합한 회귀 모델을 지정합니다.
+        alpha: 신뢰구간의 유의수준을 0과 1 사이의 실수로 지정합니다.
+
+    반환:
+        입력변수별 회귀계수 검정 결과를 데이터프레임으로 반환합니다.
+        검정통계량 열 이름은 t 분포로 검정하면 't', 정규분포로 검정하면
+        'z'입니다.
+    """
+    if not 0 < alpha < 1:
+        raise ValueError(
+            f'alpha는 0과 1 사이의 실수로 지정해야 합니다.(입력값: {alpha!r})'
+        )
+
+    statistic = 't' if model.use_t else 'z'
+    ci = np.asarray(model.conf_int(alpha=alpha))
+
+    result = pd.DataFrame(
+        data={
+            'coef': np.asarray(model.params),
+            'std_err': np.asarray(model.bse),
+            statistic: np.asarray(model.tvalues),
+            'p_value': np.asarray(model.pvalues),
+            'ci_lower': ci[:, 0],
+            'ci_upper': ci[:, 1],
+        },
+        index=model.model.exog_names,
+    )
+
+    return result
+
+
+# 선형 회귀 모델의 회귀계수 검정 결과표 반환 함수
+def ols_table(
+    model: statsmodels.api.OLS,
+    alpha: float = 0.05,
+) -> pd.DataFrame:
+    """
+    이 함수는 선형 회귀 모델의 회귀계수 검정 결과를 표로 정리합니다.
+
+    매개변수:
+        model: stat.ols() 또는 stat.stepwise() 함수처럼 statsmodels로 적합한
+            선형 회귀 모델을 지정합니다.
+        alpha: 신뢰구간의 유의수준을 지정합니다. 0.05이면 95% 신뢰구간을
+            계산합니다.(기본값: 0.05)
+
+    반환:
+        입력변수별 회귀계수(coef), 표준오차(std_err), t 통계량(t),
+        유의확률(p_value), 신뢰구간의 하한(ci_lower)과 상한(ci_upper)을
+        데이터프레임으로 반환합니다. 강건한 표준오차(cov_type='HC3' 등)로
+        적합한 모델은 정규분포로 검정하므로 t 대신 z 열을 반환합니다.
+    """
+    if not isinstance(getattr(model, 'model', None), RegressionModel):
+        raise TypeError(
+            f'{type(model).__name__} 모델은 지원하지 않습니다. statsmodels의 '
+            'OLS 등으로 적합한 선형 회귀 모델을 지정하세요. 로지스틱 회귀 '
+            '모델은 logit_table() 함수를 사용하세요.'
+        )
+
+    return _coef_table(model=model, alpha=alpha)
+
+
 # 회귀 모델의 성능 지표 반환 함수
 def reg_metrics(y_true: np.ndarray, y_pred: np.ndarray) -> pd.DataFrame:
     """
@@ -772,6 +841,56 @@ def glm(y: pd.Series, X: pd.DataFrame) -> statsmodels.api.GLM:
     model = sma.GLM(endog=y, exog=X, family=sma.families.Binomial())
 
     return model.fit()
+
+
+# 로지스틱 회귀 모델의 회귀계수 검정 결과와 오즈비 표 반환 함수
+def logit_table(
+    model: statsmodels.api.GLM,
+    alpha: float = 0.05,
+) -> pd.DataFrame:
+    """
+    이 함수는 로지스틱 회귀 모델의 회귀계수 검정 결과와 오즈비를 표로
+    정리합니다.
+
+    매개변수:
+        model: stat.glm() 함수로 적합한 로지스틱 회귀 모델 또는 statsmodels의
+            Logit으로 적합한 모델을 지정합니다.
+        alpha: 신뢰구간의 유의수준을 지정합니다. 0.05이면 95% 신뢰구간을
+            계산합니다.(기본값: 0.05)
+
+    반환:
+        입력변수별 회귀계수(coef), 표준오차(std_err), z 통계량(z),
+        유의확률(p_value), 오즈비(odds_ratio), 오즈비 신뢰구간의
+        하한(or_ci_lower)과 상한(or_ci_upper)을 데이터프레임으로 반환합니다.
+        오즈비는 입력변수가 1 증가할 때 오즈가 몇 배가 되는지를 나타내며,
+        오즈비 신뢰구간에 1이 포함되면 해당 입력변수의 효과는 유의수준
+        alpha에서 통계적으로 유의하지 않습니다.
+    """
+    fitted_model = getattr(model, 'model', None)
+
+    is_logit = isinstance(fitted_model, sma.Logit)
+    is_binomial_glm = (
+        isinstance(fitted_model, sma.GLM)
+        and isinstance(fitted_model.family, sma.families.Binomial)
+        and isinstance(fitted_model.family.link, sma.families.links.Logit)
+    )
+
+    if not (is_logit or is_binomial_glm):
+        raise TypeError(
+            f'{type(model).__name__} 모델은 지원하지 않습니다. stat.glm() '
+            '함수 또는 statsmodels의 Logit으로 적합한 로지스틱 회귀 모델을 '
+            '지정하세요.'
+        )
+
+    table = _coef_table(model=model, alpha=alpha)
+
+    # 회귀계수와 신뢰구간을 지수 변환하여 오즈비와 오즈비 신뢰구간을 계산
+    result = table.drop(columns=['ci_lower', 'ci_upper'])
+    result['odds_ratio'] = np.exp(table['coef'])
+    result['or_ci_lower'] = np.exp(table['ci_lower'])
+    result['or_ci_upper'] = np.exp(table['ci_upper'])
+
+    return result
 
 
 # 분류 모델의 성능 지표를 담는 클래스
