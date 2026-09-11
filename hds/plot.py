@@ -23,7 +23,12 @@ from sklearn.tree import (
     export_graphviz,
 )
 
-from hds._utils import import_optional, try_import
+from hds._utils import (
+    import_optional,
+    pos_proba,
+    resolve_pos_label,
+    try_import,
+)
 
 
 # 그래프를 그릴 Axes를 준비하는 함수
@@ -1161,7 +1166,7 @@ def step(
 def roc_curve(
     y_true: np.ndarray,
     y_prob: np.ndarray,
-    pos_label: str = None,
+    pos_label: str | int = None,
     color: str = None,
     label: str = None,
     ax: plt.Axes = None,
@@ -1171,9 +1176,12 @@ def roc_curve(
 
     매개변수:
         y_true: 목표변수의 실제값을 pd.Series 또는 1차원 np.ndarray로 지정합니다.
-        y_prob: 목표변수의 예측 확률을 pd.Series 또는 1차원 np.ndarray로
-            지정합니다.
-        pos_label: Positive 범주를 문자열로 지정합니다.
+        y_prob: 목표변수의 예측 확률을 지정합니다. 양성 범주의 확률을 담은
+            1차원 np.ndarray 또는 predict_proba() 함수가 반환한 2차원
+            np.ndarray를 지정할 수 있습니다.
+        pos_label: 양성 범주를 지정합니다. 생략하면 목표변수의 범주가 0과
+            1이면 1, False와 True이면 True를 양성 범주로 사용하며, 그 밖의
+            범주는 반드시 지정해야 합니다.(기본값: None)
         color: 곡선의 색을 문자열로 지정합니다.
         label: 범례에 표시할 모델명을 문자열로 지정합니다. 생략하면 varname
             패키지가 설치된 경우 y_prob로 지정한 변수명을 사용합니다.
@@ -1189,18 +1197,8 @@ def roc_curve(
     if label is None:
         label = _arg_name('y_prob')
 
-    if isinstance(y_true, np.ndarray):
-        y_class = pd.Series(data=y_true).value_counts().sort_index()
-    else:
-        y_class = y_true.value_counts().sort_index()
-
-    if pos_label is None:
-        pos_label = y_class.loc[y_class == y_class.min()].index[0]
-
-    idx = np.where(y_class.index == pos_label)[0][0]
-
-    if y_prob.ndim == 2:
-        y_prob = y_prob[:, idx]
+    pos_label = resolve_pos_label(y_true=y_true, pos_label=pos_label)
+    y_prob = pos_proba(y_true=y_true, y_prob=y_prob, pos_label=pos_label)
 
     fpr, tpr, _ = metrics.roc_curve(
         y_true=y_true,
@@ -1243,7 +1241,7 @@ def roc_curve(
 def pr_curve(
     y_true: np.ndarray,
     y_prob: np.ndarray,
-    pos_label: str = None,
+    pos_label: str | int = None,
     color: str = None,
     label: str = None,
     ax: plt.Axes = None,
@@ -1253,9 +1251,12 @@ def pr_curve(
 
     매개변수:
         y_true: 목표변수의 실제값을 pd.Series 또는 1차원 np.ndarray로 지정합니다.
-        y_prob: 목표변수의 예측 확률을 pd.Series 또는 1차원 np.ndarray로
-            지정합니다.
-        pos_label: Positive 범주를 문자열로 지정합니다.
+        y_prob: 목표변수의 예측 확률을 지정합니다. 양성 범주의 확률을 담은
+            1차원 np.ndarray 또는 predict_proba() 함수가 반환한 2차원
+            np.ndarray를 지정할 수 있습니다.
+        pos_label: 양성 범주를 지정합니다. 생략하면 목표변수의 범주가 0과
+            1이면 1, False와 True이면 True를 양성 범주로 사용하며, 그 밖의
+            범주는 반드시 지정해야 합니다.(기본값: None)
         color: 곡선의 색을 문자열로 지정합니다.
         label: 범례에 표시할 모델명을 문자열로 지정합니다. 생략하면 varname
             패키지가 설치된 경우 y_prob로 지정한 변수명을 사용합니다.
@@ -1271,18 +1272,8 @@ def pr_curve(
     if label is None:
         label = _arg_name('y_prob')
 
-    if isinstance(y_true, np.ndarray):
-        y_class = pd.Series(data=y_true).value_counts().sort_index()
-    else:
-        y_class = y_true.value_counts().sort_index()
-
-    if pos_label is None:
-        pos_label = y_class.loc[y_class == y_class.min()].index[0]
-
-    idx = np.where(y_class.index == pos_label)[0][0]
-
-    if y_prob.ndim == 2:
-        y_prob = y_prob[:, idx]
+    pos_label = resolve_pos_label(y_true=y_true, pos_label=pos_label)
+    y_prob = pos_proba(y_true=y_true, y_prob=y_prob, pos_label=pos_label)
 
     precision, recall, _ = metrics.precision_recall_curve(
         y_true=y_true,
@@ -1325,6 +1316,7 @@ def roc_cutoff(
     y_true: np.ndarray,
     y_prob: np.ndarray,
     ax: plt.Axes = None,
+    pos_label: str | int = None,
 ) -> plt.Axes:
     """
     이 함수는 분류 모델의 ROC 곡선에 최적의 분류 기준점을 추가합니다. 최적의
@@ -1334,10 +1326,14 @@ def roc_cutoff(
     매개변수:
         y_true: 목표변수의 실제값을 pd.Series 또는 1차원 np.ndarray로
             지정합니다.
-        y_prob: 목표변수의 예측 확률을 pd.Series 또는 1차원 np.ndarray로
-            지정합니다.
+        y_prob: 목표변수의 예측 확률을 지정합니다. 양성 범주의 확률을 담은
+            1차원 np.ndarray 또는 predict_proba() 함수가 반환한 2차원
+            np.ndarray를 지정할 수 있습니다.
         ax: 그래프를 그릴 matplotlib Axes 객체를 지정합니다. 생략하면 현재
             Axes에 그립니다.(기본값: None)
+        pos_label: 양성 범주를 지정합니다. 생략하면 목표변수의 범주가 0과
+            1이면 1, False와 True이면 True를 양성 범주로 사용하며, 그 밖의
+            범주는 반드시 지정해야 합니다.(기본값: None)
 
     반환값:
         그래프를 그린 matplotlib Axes 객체를 반환합니다.
@@ -1347,7 +1343,11 @@ def roc_cutoff(
 
     ax = _prepare_ax(ax)
 
-    cutoff_df = clf_cutoffs(y_true, y_prob)
+    cutoff_df = clf_cutoffs(
+        y_true=y_true,
+        y_prob=y_prob,
+        pos_label=pos_label,
+    )
 
     # ROC 곡선 그리기
     sns.lineplot(data=cutoff_df, x='FPR', y='TPR', color='black', ax=ax)

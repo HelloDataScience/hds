@@ -42,7 +42,7 @@ pip install --upgrade hds
 | --- | --- | --- |
 | `tree` | graphviz | `plot.tree()` |
 | `font` | requests, beautifulsoup4 | `plot.add_google_font()` |
-| `notebook` | ipywidgets, ipython | `stat.clf_metrics()`의 가로 배치 출력 |
+| `notebook` | (없음) | 0.4.0부터 설치할 패키지 없음(이전 설치 명령 호환용) |
 | `varname` | varname | `plot.roc_curve()`·`plot.pr_curve()`의 범례 변수명 자동 표시 |
 | `all` | 위 전체 | — |
 
@@ -149,8 +149,9 @@ X = iris[['petal_length', 'sepal_length', 'sepal_width']]
 model = stat.ols(y=y, X=X)
 print(model.summary())
 
-stat.vif(model=model)             # 분산팽창지수(VIF)로 다중공선성 점검
-stat.regression_diagnosis(model)  # 잔차 진단 그래프 4종
+stat.ols_table(model=model)                   # 회귀계수 검정표(계수·표준오차·t·p·신뢰구간)
+stat.vif(model=model)                         # 분산팽창지수(VIF)로 다중공선성 점검
+fig, axes = stat.regression_diagnosis(model)  # 잔차 진단 그래프 4종
 ```
 
 ---
@@ -186,8 +187,83 @@ stat.regression_diagnosis(model)  # 잔차 진단 그래프 4종
 | `vif` / `breusch_pagan` | 분산팽창지수 / 잔차 등분산성 검정 |
 | `cooks_distance` / `leverage` / `augment` | 영향점·레버리지 진단 |
 | `coefs` / `std_coefs` | 회귀계수 / 표준화 회귀계수 |
+| `ols_table` / `logit_table` | 회귀계수 검정표 / 회귀계수 검정표와 오즈비 |
 | `reg_metrics` / `clf_metrics` | 회귀 / 분류 성능 지표 |
 | `clf_cutoffs` | 최적 분류 기준점 탐색(표) |
+
+---
+
+## 변경 사항 (0.4.0)
+
+계산 오류를 바로잡고, 결과를 변수에 담아 다시 쓸 수 있도록 반환 형식을
+정리했습니다. 기존 코드에서 달라질 수 있는 부분은 문자열 목표변수의
+`pos_label` 지정, 파이썬 스크립트에서 `clf_metrics()` 결과의 `print()`,
+`regression_diagnosis()` 반환값 출력입니다.
+
+- **양성 범주 기본값을 바로잡았습니다.** `plot.roc_curve()`, `plot.pr_curve()`,
+  `plot.roc_cutoff()`, `stat.clf_cutoffs()`는 `pos_label`을 생략하면 목표변수의
+  범주가 0과 1이면 1, False와 True이면 True를 양성 범주로 사용합니다. 이전에는
+  도수가 적은 범주를 양성으로 골라서, 1이 다수 범주인 데이터에서 AUC·AP가
+  의도와 다르게 계산될 수 있었습니다. 문자열 범주는 양성 범주를 추측하지
+  않으므로 `pos_label`을 지정해야 합니다.
+
+  ```python
+  plot.roc_curve(y_true=y_valid, y_prob=y_prob, pos_label='Pass')
+  ```
+
+- `stat.clf_cutoffs()`와 `plot.roc_cutoff()`가 0과 1 외의 이진 범주(실수,
+  불리언, 문자열)와 `predict_proba()`가 반환한 2차원 확률을 받습니다.
+- `stat.ols()`, `stat.glm()`, `stat.hat_matrix()`, `stat.leverage()`가 원본
+  `X`에 `const` 열을 추가하지 않습니다. 2차원 `np.ndarray`도 받으며, 열 이름은
+  `x1`, `x2`, ... 순서로 지정합니다.
+- `stat.coefs()`가 statsmodels 모델(상수항 포함)과 scikit-learn 모델을 모두
+  받습니다. 지원하지 않는 모델을 지정하면 `TypeError`가 발생합니다.
+- `stat.std_resid()`가 원래 관측값의 인덱스를 유지합니다.
+- `stat.vif()`가 상수항을 열 이름이 아닌 실제 위치로 판별하므로, 상수항이 없는
+  모델에서 첫 번째 입력변수가 빠지지 않습니다.
+- `stat.std_coefs()`는 OLS·GLM이 아닌 모델에 `TypeError`를, `stat.stepwise()`는
+  잘못된 `direction`에 `ValueError`를 발생시킵니다.
+- 변수선택법의 결과가 실행할 때마다 같은 변수 순서로 나오고, 공백이 있는 열
+  이름도 처리합니다.
+- `stat.clf_metrics()`가 혼동행렬과 성능 지표를 담은 결과 객체를 반환합니다.
+  주피터 노트북에서 셀의 마지막 줄로 실행하면 이전처럼 한 번 출력하며,
+  ipywidgets가 없어도 혼동행렬과 성능 지표를 가로로 나란히 배치합니다. 셀
+  중간이나 파이썬 스크립트에서는 `print()`로 출력해야 합니다.
+
+  ```python
+  result = stat.clf_metrics(y_true=y_valid, y_pred=y_pred)
+  result.confusion_matrix        # 혼동행렬(데이터프레임)
+  result.classification_report   # 범주별 정밀도·재현율·F1 점수(데이터프레임)
+  print(result)                  # 콘솔 출력
+  ```
+
+- `notebook` 추가 설치 옵션은 설치할 패키지가 없습니다. 이전 설치 명령이
+  깨지지 않도록 옵션 이름만 남겨 두었습니다.
+- `stat.regression_diagnosis()`가 그래프를 그린 `Figure`와 `Axes` 배열을
+  반환하므로 그래프를 저장하거나 제목을 고칠 수 있습니다. 셀의 마지막 줄에서
+  호출하면 그래프 아래에 반환값이 텍스트로 출력되므로 변수에 할당하거나 끝에
+  `;`를 붙이세요. 정규 Q-Q 그래프의 기준선은 데이터 범위에 맞춰 그립니다.
+
+  ```python
+  fig, axes = stat.regression_diagnosis(model)
+  fig.savefig('diagnosis.png')
+  ```
+
+- 회귀계수 검정 결과를 표로 정리하는 `stat.ols_table()`과 `stat.logit_table()`을
+  추가했습니다. `logit_table()`은 `stat.glm()`으로 적합한 모델을 받아 오즈비와
+  오즈비 신뢰구간을 함께 계산합니다. `alpha`로 신뢰구간의 유의수준을 바꿀 수
+  있습니다.
+
+  ```python
+  stat.ols_table(stat.ols(y=y, X=X))
+  # coef, std_err, t, p_value, ci_lower, ci_upper
+
+  stat.logit_table(stat.glm(y=y, X=X))
+  # coef, std_err, z, p_value, odds_ratio, or_ci_lower, or_ci_upper
+  ```
+
+- Python 3.11 이상이 필요합니다. Python 3.10에서는 `pip install hds`가
+  0.3.5를 설치합니다.
 
 ---
 
@@ -254,18 +330,20 @@ coef_path(X, y, model='lasso', alphas=None, l1_ratio=0.5, standardize=True,
           alpha=None, palette='Spectral', legend=True, ax=None) -> plt.Axes
 roc_curve(y_true, y_prob, pos_label=None, color=None,
           label=None, ax=None) -> plt.Axes
-roc_cutoff(y_true, y_prob, ax=None) -> plt.Axes
+roc_cutoff(y_true, y_prob, ax=None, pos_label=None) -> plt.Axes
 tree(model, file_name=None, class_name=None, path=None) -> None
 
 # hds.stat
 ols(y, X) -> statsmodels OLS
 glm(y, X) -> statsmodels GLM
+ols_table(model, alpha=0.05) -> pd.DataFrame
+logit_table(model, alpha=0.05) -> pd.DataFrame
 stepwise(y, X, direction='both') -> statsmodels OLS
-regression_diagnosis(model) -> None
+regression_diagnosis(model) -> (plt.Figure, np.ndarray)
 vif(model) -> pd.DataFrame
 reg_metrics(y_true, y_pred) -> pd.DataFrame
-clf_metrics(y_true, y_pred) -> None
-clf_cutoffs(y_true, y_prob) -> pd.DataFrame
+clf_metrics(y_true, y_pred) -> ClfMetrics
+clf_cutoffs(y_true, y_prob, pos_label=None) -> pd.DataFrame
 ```
 
 ### 규제 회귀 계수 경로 예시
@@ -287,11 +365,11 @@ plot.coef_path(X=X_train, y=y_train, model='lasso', alpha=model_cv.alpha_)
 
 ## 의존성 (Requirements)
 
-- Python >= 3.10
+- Python >= 3.11
 - **필수**: numpy, pandas, scipy, matplotlib, seaborn(>=0.13),
   statsmodels, scikit-learn(>=1.4)
 - **선택**: graphviz(`tree`), requests·beautifulsoup4(`font`),
-  ipywidgets·ipython(`notebook`), varname(`varname`)
+  varname(`varname`)
 
 필수 패키지는 설치 시 자동으로 함께 설치되고, 선택 패키지는
 [선택 설치 옵션](#선택-설치-옵션-extras)으로 필요할 때만 설치합니다.
