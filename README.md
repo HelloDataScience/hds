@@ -42,7 +42,7 @@ pip install --upgrade hds
 | --- | --- | --- |
 | `tree` | graphviz | `plot.tree()` |
 | `font` | requests, beautifulsoup4 | `plot.add_google_font()` |
-| `notebook` | ipywidgets, ipython | `stat.clf_metrics()`의 가로 배치 출력 |
+| `notebook` | (없음) | 0.4.0부터 설치할 패키지 없음(이전 설치 명령 호환용) |
 | `varname` | varname | `plot.roc_curve()`·`plot.pr_curve()`의 범례 변수명 자동 표시 |
 | `all` | 위 전체 | — |
 
@@ -149,8 +149,8 @@ X = iris[['petal_length', 'sepal_length', 'sepal_width']]
 model = stat.ols(y=y, X=X)
 print(model.summary())
 
-stat.vif(model=model)             # 분산팽창지수(VIF)로 다중공선성 점검
-stat.regression_diagnosis(model)  # 잔차 진단 그래프 4종
+stat.vif(model=model)                         # 분산팽창지수(VIF)로 다중공선성 점검
+fig, axes = stat.regression_diagnosis(model)  # 잔차 진단 그래프 4종
 ```
 
 ---
@@ -220,6 +220,29 @@ stat.regression_diagnosis(model)  # 잔차 진단 그래프 4종
   잘못된 `direction`에 `ValueError`를 발생시킵니다.
 - 변수선택법의 결과가 실행할 때마다 같은 변수 순서로 나오고, 공백이 있는 열
   이름도 처리합니다.
+- `stat.clf_metrics()`가 혼동행렬과 성능 지표를 담은 결과 객체를 반환합니다.
+  주피터 노트북에서 셀의 마지막 줄로 실행하면 이전처럼 한 번 출력하며,
+  ipywidgets가 없어도 혼동행렬과 성능 지표를 가로로 나란히 배치합니다. 셀
+  중간이나 파이썬 스크립트에서는 `print()`로 출력해야 합니다.
+
+  ```python
+  result = stat.clf_metrics(y_true=y_valid, y_pred=y_pred)
+  result.confusion_matrix        # 혼동행렬(데이터프레임)
+  result.classification_report   # 범주별 정밀도·재현율·F1 점수(데이터프레임)
+  print(result)                  # 콘솔 출력
+  ```
+
+- `notebook` 추가 설치 옵션은 설치할 패키지가 없습니다. 이전 설치 명령이
+  깨지지 않도록 옵션 이름만 남겨 두었습니다.
+- `stat.regression_diagnosis()`가 그래프를 그린 `Figure`와 `Axes` 배열을
+  반환하므로 그래프를 저장하거나 제목을 고칠 수 있습니다. 셀의 마지막 줄에서
+  호출하면 그래프 아래에 반환값이 텍스트로 출력되므로 변수에 할당하거나 끝에
+  `;`를 붙이세요. 정규 Q-Q 그래프의 기준선은 데이터 범위에 맞춰 그립니다.
+
+  ```python
+  fig, axes = stat.regression_diagnosis(model)
+  fig.savefig('diagnosis.png')
+  ```
 
 ---
 
@@ -293,10 +316,10 @@ tree(model, file_name=None, class_name=None, path=None) -> None
 ols(y, X) -> statsmodels OLS
 glm(y, X) -> statsmodels GLM
 stepwise(y, X, direction='both') -> statsmodels OLS
-regression_diagnosis(model) -> None
+regression_diagnosis(model) -> (plt.Figure, np.ndarray)
 vif(model) -> pd.DataFrame
 reg_metrics(y_true, y_pred) -> pd.DataFrame
-clf_metrics(y_true, y_pred) -> None
+clf_metrics(y_true, y_pred) -> ClfMetrics
 clf_cutoffs(y_true, y_prob, pos_label=None) -> pd.DataFrame
 ```
 
@@ -323,7 +346,7 @@ plot.coef_path(X=X_train, y=y_train, model='lasso', alpha=model_cv.alpha_)
 - **필수**: numpy, pandas, scipy, matplotlib, seaborn(>=0.13),
   statsmodels, scikit-learn(>=1.4)
 - **선택**: graphviz(`tree`), requests·beautifulsoup4(`font`),
-  ipywidgets·ipython(`notebook`), varname(`varname`)
+  varname(`varname`)
 
 필수 패키지는 설치 시 자동으로 함께 설치되고, 선택 패키지는
 [선택 설치 옵션](#선택-설치-옵션-extras)으로 필요할 때만 설치합니다.

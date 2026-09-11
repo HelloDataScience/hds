@@ -1,4 +1,5 @@
 # 관련 라이브러리 호출
+import html
 import keyword
 
 import matplotlib.pyplot as plt
@@ -17,7 +18,6 @@ from hds._utils import (
     pos_proba,
     renamed_alias,
     resolve_pos_label,
-    try_import,
 )
 
 
@@ -320,7 +320,7 @@ def stepwise(
 
 
 # 선형 회귀 모델의 잔차진단 함수
-def regression_diagnosis(model: statsmodels.api.OLS) -> None:
+def regression_diagnosis(model: statsmodels.api.OLS) -> tuple:
     """
     이 함수는 선형 회귀 모델의 잔차가정 만족 여부를 확인하는 다양한 그래프를
     그립니다.
@@ -330,14 +330,16 @@ def regression_diagnosis(model: statsmodels.api.OLS) -> None:
             지정합니다.
 
     반환:
-        네 가지 그래프를 하나의 Figure에 그리며, 반환하는 객체는 없습니다.
+        네 가지 그래프를 그린 matplotlib Figure 객체와 2행 2열의 Axes 배열을
+        튜플로 반환합니다. 주피터 노트북에서 반환값이 출력되지 않게 하려면
+        fig, axes = stat.regression_diagnosis(model)처럼 변수에 할당하거나
+        문장 끝에 세미콜론(;)을 붙입니다.
     """
-    plt.figure(figsize=(10, 10), dpi=100)
+    fig, axes = plt.subplots(nrows=2, ncols=2, figsize=(10, 10), dpi=100)
+    ax1, ax2, ax3, ax4 = axes.flatten()
 
     # 선형성 가정
     # 잔차로 lowess(locally weighted linear regression) 회귀선을 산점도에 추가
-    ax1 = plt.subplot(2, 2, 1)
-
     sns.regplot(
         x=model.fittedvalues,
         y=model.resid,
@@ -347,21 +349,19 @@ def regression_diagnosis(model: statsmodels.api.OLS) -> None:
         ax=ax1,
     )
 
-    plt.axhline(y=0, color='0.5', linestyle='--', linewidth=1)
+    ax1.axhline(y=0, color='0.5', linestyle='--', linewidth=1)
 
-    plt.title(
+    ax1.set_title(
         label='Residuals vs Fitted',
         fontdict=dict(size=14, fontweight='bold'),
     )
 
-    plt.xlabel(xlabel='Fitted values', fontdict=dict(size=12))
-    plt.ylabel(ylabel='Residuals', fontdict=dict(size=12))
+    ax1.set_xlabel(xlabel='Fitted values', fontdict=dict(size=12))
+    ax1.set_ylabel(ylabel='Residuals', fontdict=dict(size=12))
 
     # 정규성 가정 확인
-    ax2 = plt.subplot(2, 2, 2)
-
     # 표준화 잔차(Standardized residuals)
-    stdres = pd.Series(data=stats.zscore(a=model.resid))
+    stdres = stats.zscore(a=np.asarray(model.resid))
 
     # 이론상 분위수(Theoretical Quantiles)
     (x, y), _ = stats.probplot(x=stdres)
@@ -377,42 +377,40 @@ def regression_diagnosis(model: statsmodels.api.OLS) -> None:
         ax=ax2,
     )
 
-    plt.plot([-4, 4], [-4, 4], color='0.5', linestyle='--', linewidth=1)
+    # 기준선을 데이터 범위에 맞춰 추가
+    lims = [min(x.min(), y.min()), max(x.max(), y.max())]
+    ax2.plot(lims, lims, color='0.5', linestyle='--', linewidth=1)
 
-    plt.title(
+    ax2.set_title(
         label='Normal Q-Q',
         fontdict=dict(size=14, fontweight='bold'),
     )
 
-    plt.xlabel(xlabel='Theoretical Quantiles', fontdict=dict(size=12))
-    plt.ylabel(ylabel='Standardized residuals', fontdict=dict(size=12))
+    ax2.set_xlabel(xlabel='Theoretical Quantiles', fontdict=dict(size=12))
+    ax2.set_ylabel(ylabel='Standardized residuals', fontdict=dict(size=12))
 
     # 등분산성 가정 확인
-    ax3 = plt.subplot(2, 2, 3)
-
     sns.regplot(
         x=model.fittedvalues,
-        y=np.sqrt(stdres.abs()),
+        y=np.sqrt(np.abs(stdres)),
         lowess=True,
         scatter_kws=dict(color='0.8', ec='0.3', s=15),
         line_kws=dict(color='red', linewidth=1),
         ax=ax3,
     )
 
-    plt.title(
+    ax3.set_title(
         label='Scale-Location',
         fontdict=dict(size=14, fontweight='bold'),
     )
 
-    plt.xlabel(xlabel='Fitted values', fontdict=dict(size=12))
-    plt.ylabel(
+    ax3.set_xlabel(xlabel='Fitted values', fontdict=dict(size=12))
+    ax3.set_ylabel(
         ylabel='Sqrt of Standardized residuals',
         fontdict=dict(size=12),
     )
 
     # 쿡의 거리(이상치 탐지)
-    ax4 = plt.subplot(2, 2, 4)
-
     sma.graphics.influence_plot(
         results=model,
         criterion='cooks',
@@ -426,7 +424,9 @@ def regression_diagnosis(model: statsmodels.api.OLS) -> None:
         text.set_ha('center')
         text.set_va('center')
 
-    plt.tight_layout()
+    fig.tight_layout()
+
+    return fig, axes
 
 
 # 쿡의 거리 계산 함수
@@ -774,8 +774,55 @@ def glm(y: pd.Series, X: pd.DataFrame) -> statsmodels.api.GLM:
     return model.fit()
 
 
+# 분류 모델의 성능 지표를 담는 클래스
+class ClfMetrics:
+    """
+    이 클래스는 clf_metrics() 함수가 계산한 분류 모델의 성능 지표를 담습니다.
+    주피터 노트북에서 셀의 마지막 줄로 실행하면 혼동행렬과 성능 지표를 가로로
+    나란히 출력하고, print() 함수로 출력하면 세로로 출력합니다.
+
+    속성:
+        confusion_matrix: 혼동행렬을 담은 데이터프레임입니다.
+        classification_report: 범주별 정밀도, 재현율, F1 점수, 도수와 정확도,
+            평균 지표를 담은 데이터프레임입니다.
+    """
+
+    def __init__(
+        self,
+        confusion_matrix: pd.DataFrame,
+        classification_report: pd.DataFrame,
+        report_text: str,
+    ) -> None:
+        self.confusion_matrix = confusion_matrix
+        self.classification_report = classification_report
+        self._report_text = report_text
+
+    # 콘솔에 출력할 문자열을 반환하는 메서드
+    def __repr__(self) -> str:
+        return (
+            '▶ Confusion Matrix\n'
+            f'{self.confusion_matrix.to_string()}\n\n'
+            '▶ Classification Report\n'
+            f'{self._report_text}'
+        )
+
+    # 주피터 노트북에 출력할 HTML을 반환하는 메서드
+    def _repr_html_(self) -> str:
+        title = '<pre style="margin: 0 0 4px 0;">{}</pre>'
+        left = title.format('▶ Confusion Matrix')
+        left += self.confusion_matrix.to_html()
+        right = title.format('▶ Classification Report')
+        right += f'<pre>{html.escape(self._report_text)}</pre>'
+
+        return (
+            '<div style="display: flex; align-items: flex-start; gap: 20px;">'
+            f'<div>{left}</div><div>{right}</div>'
+            '</div>'
+        )
+
+
 # 분류 모델의 성능 지표 반환 함수
-def clf_metrics(y_true: np.ndarray, y_pred: np.ndarray) -> None:
+def clf_metrics(y_true: np.ndarray, y_pred: np.ndarray) -> ClfMetrics:
     """
     이 함수는 분류 모델의 다양한 성능 지표를 계산합니다.
 
@@ -786,9 +833,11 @@ def clf_metrics(y_true: np.ndarray, y_pred: np.ndarray) -> None:
             지정합니다.
 
     반환:
-        분류 모델의 다양한 성능 지표를 출력합니다. ipywidgets 패키지가
-        설치되어 있으면 혼동행렬과 성능 지표를 가로로 나란히 출력하고,
-        설치되어 있지 않으면 세로로 출력합니다.
+        혼동행렬과 성능 지표를 담은 ClfMetrics 객체를 반환합니다. 주피터
+        노트북에서 셀의 마지막 줄로 실행하면 혼동행렬과 성능 지표를 가로로
+        나란히 출력합니다. 셀 중간이나 파이썬 스크립트에서는 print() 함수로
+        출력합니다. 결과를 변수에 할당하면 confusion_matrix와
+        classification_report 속성으로 데이터프레임을 사용할 수 있습니다.
     """
     y_labels = sorted(pd.Series(data=y_true).unique())
     cfm_labels = y_labels + ['All']
@@ -797,41 +846,43 @@ def clf_metrics(y_true: np.ndarray, y_pred: np.ndarray) -> None:
     cfm.index = [f'True_{i}' for i in cfm_labels]
     cfm.columns = [f'Pred_{i}' for i in cfm_labels]
 
-    report = metrics.classification_report(
+    report_text = metrics.classification_report(
         y_true=y_true,
         y_pred=y_pred,
         digits=4,
     )
 
-    widgets = try_import('ipywidgets')
-    ipython = try_import('IPython.display')
+    report_dict = metrics.classification_report(
+        y_true=y_true,
+        y_pred=y_pred,
+        output_dict=True,
+    )
 
-    # ipywidgets가 없으면 혼동행렬과 성능 지표를 세로로 출력
-    if widgets is None or ipython is None:
-        print('▶ Confusion Matrix')
-        print(cfm.to_string())
-        print()
-        print('▶ Classification Report')
-        print(report)
-        return
+    accuracy = report_dict.pop('accuracy', None)
+    report = pd.DataFrame(data=report_dict).T
+    report['support'] = report['support'].astype(int)
 
-    display = ipython.display
+    # 정확도는 텍스트 보고서처럼 평균 지표 위에 F1 점수와 도수로 기록
+    if accuracy is not None:
+        is_avg = report.index.str.endswith(' avg')
+        accuracy_row = pd.DataFrame(
+            data={
+                'precision': [np.nan],
+                'recall': [np.nan],
+                'f1-score': [accuracy],
+                'support': [len(y_true)],
+            },
+            index=['accuracy'],
+        )
+        report = pd.concat(
+            objs=[report[~is_avg], accuracy_row, report[is_avg]],
+        )
 
-    left = widgets.Output()
-    right = widgets.Output()
-
-    with left:
-        print('▶ Confusion Matrix')
-        display(cfm)
-    with right:
-        print('▶ Classification Report')
-        print(report)
-
-    left.layout = widgets.Layout(margin='0px 10px 0px 0px')
-    right.layout = widgets.Layout(margin='0px 0px 0px 10px')
-
-    box = widgets.HBox(children=[left, right])
-    display(box)
+    return ClfMetrics(
+        confusion_matrix=cfm,
+        classification_report=report,
+        report_text=report_text,
+    )
 
 
 # 분류 모델의 성능 지표 반환 함수(이전 이름)

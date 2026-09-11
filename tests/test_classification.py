@@ -106,3 +106,70 @@ def test_clf_cutoffs_requires_pos_label_for_strings(clf_data):
     y, proba = clf_data
     with pytest.raises(ValueError, match='pos_label'):
         stat.clf_cutoffs(y_true=y.map({0: 'N', 1: 'Y'}), y_prob=proba)
+
+
+# clf_metrics()
+def test_clf_metrics_returns_result_without_printing(clf_data, capsys):
+    y, proba = clf_data
+    y_pred = (proba[:, 1] >= 0.5).astype(int)
+    result = stat.clf_metrics(y_true=y, y_pred=y_pred)
+    assert isinstance(result, stat.ClfMetrics)
+    assert capsys.readouterr().out == ''
+
+
+def test_clf_metrics_confusion_matrix(clf_data):
+    y, proba = clf_data
+    y_pred = (proba[:, 1] >= 0.5).astype(int)
+    cfm = stat.clf_metrics(y_true=y, y_pred=y_pred).confusion_matrix
+    expected = metrics.confusion_matrix(y_true=y, y_pred=y_pred)
+
+    assert list(cfm.index) == ['True_0', 'True_1', 'True_All']
+    assert list(cfm.columns) == ['Pred_0', 'Pred_1', 'Pred_All']
+    np.testing.assert_array_equal(cfm.iloc[:2, :2], expected)
+    assert cfm.loc['True_All', 'Pred_All'] == len(y)
+
+
+def test_clf_metrics_classification_report(clf_data):
+    y, proba = clf_data
+    y_pred = (proba[:, 1] >= 0.5).astype(int)
+    report = stat.clf_metrics(y_true=y, y_pred=y_pred).classification_report
+    expected = metrics.classification_report(
+        y_true=y,
+        y_pred=y_pred,
+        output_dict=True,
+    )
+
+    rows = ['0', '1', 'accuracy', 'macro avg', 'weighted avg']
+    assert list(report.index) == rows
+
+    for row in ['0', '1', 'macro avg', 'weighted avg']:
+        for col in ['precision', 'recall', 'f1-score', 'support']:
+            assert report.loc[row, col] == pytest.approx(expected[row][col])
+
+    assert report.loc['accuracy', 'f1-score'] == pytest.approx(
+        expected['accuracy']
+    )
+    assert report.loc['accuracy', 'support'] == len(y)
+
+
+def test_clf_metrics_display(clf_data):
+    y, proba = clf_data
+    y_pred = (proba[:, 1] >= 0.5).astype(int)
+    result = stat.clf_metrics(y_true=y, y_pred=y_pred)
+
+    text = repr(result)
+    assert text.startswith('▶ Confusion Matrix')
+    assert '▶ Classification Report' in text
+
+    html_text = result._repr_html_()
+    assert html_text.count('<table') == 1
+    assert '▶ Classification Report' in html_text
+
+
+def test_clf_metrics_old_name_with_string_labels(clf_data):
+    y, proba = clf_data
+    labels = y.map({0: 'N', 1: 'Y'})
+    y_pred = pd.Series(data=np.where(proba[:, 1] >= 0.5, 'Y', 'N'))
+    result = stat.clfmetrics(y_true=labels, y_pred=y_pred)
+    expected = ['True_N', 'True_Y', 'True_All']
+    assert list(result.confusion_matrix.index) == expected

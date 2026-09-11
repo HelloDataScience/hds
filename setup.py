@@ -9,8 +9,9 @@ EXTRAS_REQUIRE = {
     'tree': ['graphviz'],
     # plot.add_google_font() 함수로 구글 폰트를 설치할 때 필요합니다.
     'font': ['requests', 'beautifulsoup4'],
-    # stat.clf_metrics() 함수의 결과를 주피터에서 나란히 출력할 때 필요합니다.
-    'notebook': ['ipywidgets', 'ipython'],
+    # 0.4.0부터 stat.clf_metrics() 함수가 추가 패키지 없이 결과를 나란히
+    # 출력합니다. 이전 설치 명령(hds[notebook])과의 호환을 위해 남겨 둡니다.
+    'notebook': [],
     # plot.roc_curve()와 plot.pr_curve() 함수에서 범례에 변수명을 자동으로
     # 표시할 때 필요합니다.(label 매개변수로 대체할 수 있습니다.)
     'varname': ['varname'],
