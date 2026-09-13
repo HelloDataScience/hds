@@ -197,6 +197,23 @@ fig, axes = stat.regression_diagnosis(model)  # 잔차 진단 그래프 4종
 
 ---
 
+## 변경 사항 (0.5.2)
+
+- **`plot.set_font()`를 추가했습니다.** 구글 폰트에서 확인한 폰트명을
+  지정하면 모든 굵기의 글꼴 파일을 matplotlib 임시 폴더에 내려받아 등록하고,
+  그래프의 한글 폰트(글자 크기 10)와 `axes.unicode_minus=False`를 설정합니다.
+  운영체제에 폰트를 설치하지 않으므로 관리자 권한이나 커널 재시작 없이
+  바로 사용할 수 있고, 한 번 내려받은 파일은 다시 내려받지 않습니다.
+  그래프 크기·해상도·범례는 바꾸지 않습니다.
+  ```python
+  plot.set_font(font_name='Gowun Batang')
+  ```
+- Noto Sans KR·Noto Serif KR처럼 구글 폰트 저장소에 가변 폰트 파일만 있는
+  폰트는 matplotlib이 굵기를 고르지 못해 가는 글씨로 나옵니다.
+- 기존 `plot.add_google_font()` 등 폰트 설치 함수는 그대로입니다.
+
+---
+
 ## 변경 사항 (0.5.1)
 
 - **`stat.clf_cutoffs()`의 이름을 `stat.cutoff_table()`로 바꿨습니다.**
