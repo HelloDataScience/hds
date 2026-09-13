@@ -7,8 +7,12 @@ import platform
 import re
 import shutil
 import subprocess
+import urllib.error
+import urllib.parse
+import urllib.request
 
 import matplotlib
+import matplotlib.font_manager as fm
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -36,6 +40,7 @@ __all__ = [
     'download_google_font_file',
     'install_google_font_path',
     'add_google_font',
+    'set_font',
     'remove_legend',
     'box_group',
     'scatter',
@@ -261,6 +266,111 @@ def add_google_font(font_name: str) -> None:
     cache_dir = matplotlib.get_cachedir()
     font_list = glob.glob(f'{cache_dir}/fontlist-*.json')[0]
     os.remove(path=font_list)
+
+
+# 구글 폰트 저장소에서 모든 굵기의 글꼴 파일 URL 목록을 반환하는 함수
+def _google_font_urls(font_name: str) -> list:
+    """
+    이 함수는 구글 폰트명을 지정하면 구글 폰트 저장소의 METADATA.pb 파일을
+    읽고 모든 굵기의 글꼴 파일 URL 목록을 반환합니다.
+
+    매개변수:
+        font_name: 구글 폰트명을 문자열로 지정합니다.
+
+    반환값:
+        글꼴 파일의 URL을 리스트로 반환합니다.
+    """
+    # 구글 폰트명에서 공백과 기호를 제거하여 폴더명 생성
+    folder = re.sub(pattern=r'[^a-z0-9]', repl='', string=font_name.lower())
+    domain = 'https://raw.githubusercontent.com/google/fonts/main'
+
+    # 라이선스별 폴더를 차례로 확인
+    for license_dir in ('ofl', 'apache', 'ufl'):
+        url = f'{domain}/{license_dir}/{folder}'
+        try:
+            with urllib.request.urlopen(f'{url}/METADATA.pb', timeout=30) as r:
+                metadata = r.read().decode('utf-8')
+        except urllib.error.HTTPError as error:
+            if error.code == 404:
+                continue
+            raise
+
+        # 모든 글꼴 파일명 추출
+        files = re.findall(r'filename: "([^"]+)"', metadata)
+        return [f'{url}/{urllib.parse.quote(file)}' for file in files]
+
+    raise ValueError(
+        f"구글 폰트에서 '{font_name}'을(를) 찾을 수 없습니다. "
+        'https://fonts.google.com 에서 폰트명을 확인하세요.'
+    )
+
+
+# 구글 폰트 파일을 matplotlib 임시 폴더에 내려받는 함수
+def _google_font_paths(font_name: str) -> list:
+    """
+    이 함수는 구글 폰트명을 지정하면 모든 굵기의 글꼴 파일을 matplotlib 임시
+    폴더에 내려받고 파일 경로 목록을 반환합니다. 이미 내려받은 글꼴 파일이
+    있으면 다시 내려받지 않습니다.
+
+    매개변수:
+        font_name: 구글 폰트명을 문자열로 지정합니다.
+
+    반환값:
+        글꼴 파일 경로를 리스트로 반환합니다.
+    """
+    # 구글 폰트별 글꼴 파일 보관 폴더 지정
+    folder = re.sub(pattern=r'[^a-z0-9]', repl='', string=font_name.lower())
+    font_dir = os.path.join(matplotlib.get_cachedir(), 'hds_fonts', folder)
+
+    # 이미 내려받은 글꼴 파일이 있으면 파일 경로 목록 반환
+    font_paths = sorted(glob.glob(os.path.join(font_dir, '*.ttf')))
+    if font_paths:
+        return font_paths
+
+    # 모든 글꼴 파일을 내려받은 다음에 저장하여 일부만 남지 않도록 처리
+    contents = {}
+    for url in _google_font_urls(font_name):
+        file = urllib.parse.unquote(os.path.basename(url))
+        with urllib.request.urlopen(url, timeout=60) as r:
+            contents[file] = r.read()
+    os.makedirs(name=font_dir, exist_ok=True)
+    for file, content in contents.items():
+        path = os.path.join(font_dir, file)
+        with open(file=path, mode='wb') as f:
+            f.write(content)
+        font_paths.append(path)
+    return font_paths
+
+
+# 구글 폰트를 그래프의 한글 폰트로 설정하는 함수
+def set_font(font_name: str) -> None:
+    """
+    이 함수는 구글 폰트(https://fonts.google.com)에서 확인한 폰트명을 지정하면
+    글꼴 파일을 내려받아 matplotlib에 등록하고 그래프의 한글 폰트로
+    설정합니다. 운영체제에 폰트를 설치하지 않으므로 관리자 권한이나 커널
+    재시작이 필요 없습니다. 처음 내려받을 때만 인터넷 연결이 필요합니다.
+
+    매개변수:
+        font_name: 구글 폰트명을 문자열로 지정합니다. 예: 'Gowun Batang'
+
+    반환값:
+        없습니다.
+    """
+    # 구글 폰트 파일 경로 목록 생성
+    font_paths = _google_font_paths(font_name)
+
+    # 모든 굵기의 글꼴 파일을 matplotlib 폰트 목록에 등록
+    for font_path in font_paths:
+        fm.fontManager.addfont(path=font_path)
+
+    # 글꼴 파일에 기록된 폰트명 확인
+    font_name = fm.FontProperties(fname=font_paths[0]).get_name()
+
+    # 한글 폰트와 글자 크기 설정
+    plt.rc(group='font', family=font_name, size=10)
+
+    # 축에 유니코드 마이너스를 출력하지 않도록 설정
+    plt.rc(group='axes', unicode_minus=False)
 
 
 # 범례가 있을 때만 제거하는 함수

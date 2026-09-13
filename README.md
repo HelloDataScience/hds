@@ -69,6 +69,9 @@ pip install 'hds[all]'    # 0.2.x와 동일한 구성
 import seaborn as sns
 from hds import plot
 
+# 구글 폰트에서 확인한 이름으로 한글 폰트 설정
+plot.set_font(font_name='Gowun Batang')
+
 iris = sns.load_dataset('iris')
 
 # 범주별 분포 비교 (상자그림 + 범주 평균 + 전체 평균선)
@@ -175,6 +178,7 @@ fig, axes = stat.regression_diagnosis(model)  # 잔차 진단 그래프 4종
 | `roc_cutoff` | 최적 분류 기준점 시각화 |
 | `screeplot` / `biplot` | 주성분 분석 진단 |
 | `wcss` / `silhouette` | k-평균 군집 수 진단 |
+| `set_font` | 구글 폰트를 내려받아 그래프의 한글 폰트로 설정 |
 | `add_google_font` | 구글 폰트 설치(한글 폰트 등) |
 
 ### `hds.stat` — 통계·진단
