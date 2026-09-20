@@ -138,6 +138,13 @@ plot.roc_curve(y_true=y_test, y_prob=prob_a, label='의사결정나무', ax=ax)
 plot.roc_curve(y_true=y_test, y_prob=prob_b, label='랜덤 포레스트', ax=ax)
 ```
 
+범례를 `Axes` 바깥 오른쪽에 그리는 함수는 그래프를 저장할 때 범례가 잘릴 수
+있으므로 `bbox_inches='tight'`를 지정하세요.
+
+```python
+fig.savefig('roc_curve.png', bbox_inches='tight')
+```
+
 ### 회귀 분석 예시
 
 ```python
@@ -194,6 +201,25 @@ fig, axes = stat.regression_diagnosis(model)  # 잔차 진단 그래프 4종
 | `ols_table` / `logit_table` | 회귀계수 검정표 / 회귀계수 검정표와 오즈비 |
 | `reg_metrics` / `clf_metrics` | 회귀 / 분류 성능 지표 |
 | `cutoff_table` | 분류 기준점별 성능 지표(표) |
+
+---
+
+## 변경 사항 (0.5.3)
+
+- **`plot.pr_curve()`에 목표변수의 양성비율을 회색 가로 점선으로 추가했습니다.**
+  PR 곡선은 양성비율이 기준선이므로, 곡선이 기준선보다 얼마나 위에 있는지로
+  모델의 성능을 가늠할 수 있습니다.
+- **`plot.roc_curve()`와 `plot.pr_curve()`의 범례를 `Axes` 오른쪽 바깥으로
+  옮겼습니다.** 여러 모델을 겹쳐 그릴 때 범례가 곡선을 가리지 않습니다.
+  ```python
+  ax.legend(loc='center left', bbox_to_anchor=(1, 0.5), fontsize=8)
+  ```
+- **`plot.set_font()`가 `savefig.bbox='tight'`를 함께 설정합니다.** `Axes`
+  바깥에 그린 범례가 그래프를 저장할 때 잘리지 않습니다. `set_font()`를
+  호출하지 않는다면 저장할 때 `bbox_inches='tight'`를 지정하세요.
+  ```python
+  fig.savefig('roc_curve.png', bbox_inches='tight')
+  ```
 
 ---
 
@@ -323,7 +349,7 @@ fig, axes = stat.regression_diagnosis(model)  # 잔차 진단 그래프 4종
 
   ```python
   fig, axes = stat.regression_diagnosis(model)
-  fig.savefig('diagnosis.png')
+  fig.savefig('diagnosis.png', bbox_inches='tight')
   ```
 
 - 회귀계수 검정 결과를 표로 정리하는 `stat.ols_table()`과 `stat.logit_table()`을

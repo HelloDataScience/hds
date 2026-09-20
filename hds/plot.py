@@ -372,6 +372,9 @@ def set_font(font_name: str) -> None:
     # 축에 유니코드 마이너스를 출력하지 않도록 설정
     plt.rc(group='axes', unicode_minus=False)
 
+    # Axes 바깥에 그린 범례가 잘리지 않도록 그래프 저장 옵션 설정
+    plt.rc(group='savefig', bbox='tight')
+
 
 # 범례가 있을 때만 제거하는 함수
 def remove_legend(ax: plt.Axes = None) -> None:
@@ -1383,7 +1386,7 @@ def roc_curve(
     ax.set_title(label='ROC Curve', fontdict={'fontweight': 'bold'})
     ax.set_xlabel(xlabel='FPR')
     ax.set_ylabel(ylabel='TPR')
-    ax.legend(loc='lower right', fontsize=8)
+    ax.legend(loc='center left', bbox_to_anchor=(1, 0.5), fontsize=8)
 
     return ax
 
@@ -1451,13 +1454,17 @@ def pr_curve(
         linewidth=1.0,
     )
 
+    pos_rate = pd.Series(data=y_true).eq(other=pos_label).mean()
+
+    ax.axhline(y=pos_rate, color='0.5', linestyle='--', linewidth=0.5)
+
     ax.set_title(
         label='Precision-Recall Curve',
         fontdict={'fontweight': 'bold'},
     )
     ax.set_xlabel(xlabel='Recall')
     ax.set_ylabel(ylabel='Precision')
-    ax.legend(loc='lower left', fontsize=8)
+    ax.legend(loc='center left', bbox_to_anchor=(1, 0.5), fontsize=8)
 
     return ax
 
