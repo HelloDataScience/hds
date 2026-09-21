@@ -1383,6 +1383,9 @@ def roc_curve(
         linewidth=0.5,
     )
 
+    ax.set_xlim(-0.02, 1.02)
+    ax.set_ylim(-0.02, 1.02)
+
     ax.set_title(label='ROC Curve', fontdict={'fontweight': 'bold'})
     ax.set_xlabel(xlabel='FPR')
     ax.set_ylabel(ylabel='TPR')
@@ -1457,6 +1460,20 @@ def pr_curve(
     pos_rate = pd.Series(data=y_true).eq(other=pos_label).mean()
 
     ax.axhline(y=pos_rate, color='0.5', linestyle='--', linewidth=0.5)
+
+    # 양성비율 텍스트 추가
+    ax.text(
+        x=0.01,
+        y=pos_rate + 0.01,
+        s=f'Positive rate = {pos_rate:.4f}',
+        ha='left',
+        va='bottom',
+        fontsize=8,
+        color='0.5',
+    )
+
+    ax.set_xlim(-0.02, 1.02)
+    ax.set_ylim(-0.02, 1.02)
 
     ax.set_title(
         label='Precision-Recall Curve',
