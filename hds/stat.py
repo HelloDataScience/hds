@@ -45,6 +45,9 @@ __all__ = [
     'clf_metrics',
     'cutoff_table',
     'epi_roc',
+    'ab_sample_size',
+    'ab_power',
+    'ab_mde',
 ]
 
 
@@ -1166,6 +1169,417 @@ def epi_roc(
     from hds.plot import roc_cutoff
 
     return roc_cutoff(y_true=y_true, y_prob=y_prob, ax=ax, pos_label=pos_label)
+
+
+# A/B 테스트 설계값을 확인하고 정리하는 함수
+def _ab_setup(
+    metric: str,
+    baseline: float,
+    sd: float,
+    alpha: float,
+    power: float,
+    ratio: float,
+    n_groups: int,
+    icc: float,
+    cluster_size: int,
+    alternative: str,
+) -> dict:
+    """
+    이 함수는 ab_sample_size(), ab_power(), ab_mde() 함수가 공통으로 쓰는
+    입력값을 검사하고, 비교 1회당 유의수준과 설계효과를 계산합니다.
+    """
+    if metric not in ('proportion', 'mean'):
+        raise ValueError("metric은 'proportion' 또는 'mean'으로 지정합니다.")
+
+    if baseline is None:
+        raise ValueError('baseline(대조군의 현재 수준)을 지정해야 합니다.')
+
+    if metric == 'proportion' and not 0 < baseline < 1:
+        raise ValueError('비율 지표의 baseline은 0과 1 사이로 지정합니다.')
+
+    if metric == 'mean' and (sd is None or sd <= 0):
+        raise ValueError('평균 지표는 sd(표준편차)를 양수로 지정해야 합니다.')
+
+    if alternative not in ('two-sided', 'larger'):
+        raise ValueError("alternative는 'two-sided' 또는 'larger'로 지정합니다.")
+
+    if power is not None and not 0 < power < 1:
+        raise ValueError('power는 0과 1 사이로 지정합니다.')
+
+    if not 0 < alpha < 1:
+        raise ValueError('alpha는 0과 1 사이로 지정합니다.')
+
+    if ratio <= 0:
+        raise ValueError('ratio는 양수로 지정합니다.')
+
+    if n_groups < 2:
+        raise ValueError('n_groups는 대조군을 포함해 2 이상으로 지정합니다.')
+
+    if (icc is None) != (cluster_size is None):
+        raise ValueError('점포 단위 실험은 icc와 cluster_size를 함께 지정합니다.')
+
+    if icc is not None and not 0 <= icc <= 1:
+        raise ValueError('icc는 0과 1 사이로 지정합니다.')
+
+    if cluster_size is not None and cluster_size < 1:
+        raise ValueError('cluster_size는 1 이상으로 지정합니다.')
+
+    # 처리군이 여러 개이면 대조군과의 비교 횟수로 유의수준을 나눔(Bonferroni)
+    alpha_adj = alpha / (n_groups - 1)
+
+    # 같은 점포(군집) 고객끼리 비슷한 만큼 필요한 인원이 늘어남
+    if icc is None:
+        deff = 1.0
+    else:
+        deff = 1 + (cluster_size - 1) * icc
+
+    return {'alpha_adj': alpha_adj, 'deff': deff}
+
+
+# 기대 개선폭을 절대 차이로 바꾸는 함수
+def _ab_lift(baseline: float, lift: float, relative: bool) -> float:
+    """
+    이 함수는 relative=True로 지정한 상대 개선폭(예: 0.2 = 20%)을 baseline에
+    곱해 절대 차이로 바꿉니다.
+    """
+    if lift is None or lift == 0:
+        raise ValueError('lift(기대 개선폭)를 0이 아닌 값으로 지정해야 합니다.')
+
+    return baseline * lift if relative else lift
+
+
+# 지표별 효과 크기와 검정력 계산 객체를 반환하는 함수
+def _ab_effect(
+    metric: str,
+    baseline: float,
+    lift_abs: float,
+    sd: float,
+) -> tuple:
+    """
+    이 함수는 비율 지표는 Cohen's h와 정규분포 기반 검정력 계산 객체를,
+    평균 지표는 Cohen's d와 t분포 기반 검정력 계산 객체를 반환합니다.
+    """
+    from statsmodels.stats.power import NormalIndPower, TTestIndPower
+    from statsmodels.stats.proportion import proportion_effectsize
+
+    if metric == 'proportion':
+        treated = baseline + lift_abs
+        if not 0 < treated < 1:
+            raise ValueError(
+                '처리군의 기대 비율(baseline + lift)이 0과 1 사이가 아닙니다.'
+            )
+        effect = proportion_effectsize(prop1=treated, prop2=baseline)
+        return effect, NormalIndPower(), "Cohen's h"
+
+    effect = lift_abs / sd
+    return effect, TTestIndPower(), "Cohen's d"
+
+
+# 비교 1회의 효과 크기를 기대 개선폭으로 되돌리는 함수
+def _ab_effect_to_lift(
+    metric: str,
+    baseline: float,
+    effect: float,
+    sd: float,
+) -> float:
+    """
+    이 함수는 ab_mde() 함수에서 구한 최소 효과 크기를 원래 단위의 절대 차이로
+    바꿉니다.
+    """
+    if metric == 'proportion':
+        phi = 2 * np.arcsin(np.sqrt(baseline)) + effect
+        if phi > np.pi:
+            return np.nan
+        return np.sin(phi / 2) ** 2 - baseline
+
+    return effect * sd
+
+
+# 결과표를 만드는 함수
+def _ab_table(rows: list) -> pd.DataFrame:
+    """
+    이 함수는 (항목, 값, 설명) 튜플의 리스트를 reg_metrics() 함수와 같은
+    형태의 데이터프레임으로 변환합니다.
+    """
+    # 인원·점포 수·일수는 정수로, 나머지 실수는 소수점 넷째 자리까지 정리
+    counts = ('n_', 'clusters_', 'days')
+    tidy = []
+    for item, value, desc in rows:
+        if item.startswith(counts):
+            value = int(np.ceil(value))
+        elif isinstance(value, (float, np.floating)):
+            value = round(float(value), 4)
+        tidy.append((item, value, desc))
+
+    return pd.DataFrame(
+        data=tidy,
+        columns=['item', 'value', 'description'],
+        dtype=object,
+    )
+
+
+# A/B 테스트에 필요한 표본 크기를 계산하는 함수
+def ab_sample_size(
+    metric: str = 'proportion',
+    baseline: float = None,
+    lift: float = None,
+    relative: bool = False,
+    sd: float = None,
+    alpha: float = 0.05,
+    power: float = 0.8,
+    ratio: float = 1.0,
+    n_groups: int = 2,
+    icc: float = None,
+    cluster_size: int = None,
+    daily_traffic: float = None,
+    alternative: str = 'two-sided',
+) -> pd.DataFrame:
+    """
+    이 함수는 A/B 테스트에서 기대하는 효과를 잡아내는 데 필요한 그룹별 인원을
+    계산합니다. 비율 지표(구매전환율, 쿠폰 사용률, 재구매율 등)는 Cohen's h와
+    정규분포, 평균 지표(객단가, 고객당 매출 등)는 Cohen's d와 t분포를
+    사용합니다.
+
+    매개변수:
+        metric: 평가 지표의 종류를 'proportion'(비율) 또는 'mean'(평균)으로
+            지정합니다.(기본값: 'proportion')
+        baseline: 대조군의 현재 수준을 지정합니다. 비율 지표는 0과 1 사이의
+            비율(예: 0.10), 평균 지표는 평균(예: 52000)입니다.
+        lift: 처리군에서 기대하는 개선폭을 지정합니다. relative=False이면
+            절대 차이(예: 0.02 = 2%p, 2000 = 2,000원), relative=True이면
+            baseline 대비 비율(예: 0.2 = 20%)입니다.
+        relative: lift를 상대 개선폭으로 볼지 지정합니다.(기본값: False)
+        sd: 평균 지표의 표준편차를 지정합니다. 과거 데이터에서 계산한 값을
+            사용하며, 평균 지표는 반드시 지정해야 합니다. 두 그룹의
+            표준편차가 같다고 가정하므로, 고객당 매출처럼 0원이 많은
+            지표에서 구매 고객이 늘면 처리군의 표준편차가 더 커질 수
+            있습니다. 이때는 sd를 10% 정도 크게 지정하세요.(기본값: None)
+        alpha: 유의수준을 지정합니다.(기본값: 0.05)
+        power: 검정력을 지정합니다.(기본값: 0.8)
+        ratio: 대조군 대비 처리군 인원의 배수를 지정합니다. 처리군을 대조군의
+            4배로 배정하면 4, 절반으로 배정하면 0.5입니다.(기본값: 1.0)
+        n_groups: 대조군을 포함한 그룹 수를 지정합니다. 3 이상이면 처리군마다
+            대조군과 비교하므로 유의수준을 비교 횟수로 나눕니다(Bonferroni).
+            (기본값: 2)
+        icc: 점포처럼 고객을 묶어서 배정할 때, 같은 묶음 안 고객끼리 비슷한
+            정도(급내상관계수)를 지정합니다. cluster_size와 함께
+            지정합니다.(기본값: None)
+        cluster_size: 묶음(점포) 하나에 들어가는 평균 고객 수를
+            지정합니다.(기본값: None)
+        daily_traffic: 하루에 실험에 들어오는 전체 고객 수(모든 그룹
+            합계)를 지정합니다. 지정하면 필요한 실험 일수를 함께
+            계산합니다.(기본값: None)
+        alternative: 'two-sided'(양측 검정) 또는 'larger'(처리군이 더 큰지만
+            보는 단측 검정)를 지정합니다.(기본값: 'two-sided')
+
+    반환:
+        그룹별 필요 인원, 전체 인원, 효과 크기 등을 item, value, description
+        열의 데이터프레임으로 반환합니다. 인원과 일수는 올림합니다.
+    """
+    setup = _ab_setup(
+        metric=metric, baseline=baseline, sd=sd, alpha=alpha, power=power,
+        ratio=ratio, n_groups=n_groups, icc=icc, cluster_size=cluster_size,
+        alternative=alternative,
+    )
+    lift_abs = _ab_lift(baseline=baseline, lift=lift, relative=relative)
+    effect, engine, effect_name = _ab_effect(
+        metric=metric, baseline=baseline, lift_abs=lift_abs, sd=sd,
+    )
+
+    n_raw = engine.solve_power(
+        effect_size=abs(effect),
+        nobs1=None,
+        alpha=setup['alpha_adj'],
+        power=power,
+        ratio=ratio,
+        alternative=alternative,
+    )
+
+    # 군집 설계효과를 곱한 뒤 그룹별 인원을 올림
+    n_control = int(np.ceil(n_raw * setup['deff']))
+    n_treatment = int(np.ceil(n_raw * ratio * setup['deff']))
+    n_total = n_control + n_treatment * (n_groups - 1)
+
+    rows = [
+        ('baseline', baseline, '대조군의 현재 수준'),
+        ('treatment', baseline + lift_abs, '처리군의 기대 수준'),
+        ('lift', lift_abs, '기대 개선폭(절대 차이)'),
+        ('effect_size', effect, effect_name),
+        ('alpha', setup['alpha_adj'], '비교 1회당 유의수준'),
+        ('power', power, '검정력'),
+        ('n_control', n_control, '대조군 인원'),
+        ('n_treatment', n_treatment, '처리군 1개당 인원'),
+        ('n_total', n_total, f'전체 인원({n_groups}개 그룹)'),
+    ]
+
+    if icc is not None:
+        rows.append(('design_effect', setup['deff'], '설계효과 1 + (점포당 고객 수 - 1) × ICC'))
+        rows.append((
+            'clusters_control',
+            int(np.ceil(n_control / cluster_size)),
+            '대조군 점포(묶음) 수',
+        ))
+        rows.append((
+            'clusters_treatment',
+            int(np.ceil(n_treatment / cluster_size)),
+            '처리군 1개당 점포(묶음) 수',
+        ))
+
+    if daily_traffic is not None:
+        rows.append((
+            'days',
+            int(np.ceil(n_total / daily_traffic)),
+            f'하루 {daily_traffic:,.0f}명 유입 시 필요 일수',
+        ))
+
+    return _ab_table(rows=rows)
+
+
+# 주어진 인원으로 A/B 테스트의 검정력을 계산하는 함수
+def ab_power(
+    metric: str = 'proportion',
+    baseline: float = None,
+    lift: float = None,
+    n_control: int = None,
+    relative: bool = False,
+    sd: float = None,
+    alpha: float = 0.05,
+    ratio: float = 1.0,
+    n_groups: int = 2,
+    icc: float = None,
+    cluster_size: int = None,
+    alternative: str = 'two-sided',
+) -> pd.DataFrame:
+    """
+    이 함수는 이미 정해진 인원으로 A/B 테스트를 할 때, 기대하는 효과가 실제로
+    있다면 그것을 잡아낼 확률(검정력)을 계산합니다. 매개변수는
+    ab_sample_size() 함수와 같습니다.
+
+    매개변수:
+        n_control: 대조군 인원을 지정합니다. 처리군 인원은 n_control ×
+            ratio입니다.
+        그 밖의 매개변수는 ab_sample_size() 함수를 참고하세요.
+
+    반환:
+        검정력과 효과 크기 등을 item, value, description 열의 데이터프레임으로
+        반환합니다.
+    """
+    setup = _ab_setup(
+        metric=metric, baseline=baseline, sd=sd, alpha=alpha, power=None,
+        ratio=ratio, n_groups=n_groups, icc=icc, cluster_size=cluster_size,
+        alternative=alternative,
+    )
+    if n_control is None or n_control < 2:
+        raise ValueError('n_control은 2 이상으로 지정합니다.')
+
+    lift_abs = _ab_lift(baseline=baseline, lift=lift, relative=relative)
+    effect, engine, effect_name = _ab_effect(
+        metric=metric, baseline=baseline, lift_abs=lift_abs, sd=sd,
+    )
+
+    # 군집 설계효과만큼 실질 인원이 줄어듦
+    n_eff = n_control / setup['deff']
+
+    result = engine.power(
+        effect_size=abs(effect),
+        nobs1=n_eff,
+        alpha=setup['alpha_adj'],
+        ratio=ratio,
+        alternative=alternative,
+    )
+
+    rows = [
+        ('baseline', baseline, '대조군의 현재 수준'),
+        ('treatment', baseline + lift_abs, '처리군의 기대 수준'),
+        ('lift', lift_abs, '기대 개선폭(절대 차이)'),
+        ('effect_size', effect, effect_name),
+        ('alpha', setup['alpha_adj'], '비교 1회당 유의수준'),
+        ('n_control', n_control, '대조군 인원'),
+        ('n_treatment', n_control * ratio, '처리군 1개당 인원'),
+        ('power', float(result), '검정력'),
+    ]
+
+    if icc is not None:
+        rows.insert(-1, ('design_effect', setup['deff'], '설계효과 1 + (점포당 고객 수 - 1) × ICC'))
+
+    return _ab_table(rows=rows)
+
+
+# 주어진 인원으로 잡아낼 수 있는 최소 효과를 계산하는 함수
+def ab_mde(
+    metric: str = 'proportion',
+    baseline: float = None,
+    n_control: int = None,
+    sd: float = None,
+    alpha: float = 0.05,
+    power: float = 0.8,
+    ratio: float = 1.0,
+    n_groups: int = 2,
+    icc: float = None,
+    cluster_size: int = None,
+    alternative: str = 'two-sided',
+) -> pd.DataFrame:
+    """
+    이 함수는 이미 정해진 인원으로 A/B 테스트를 할 때, 주어진 검정력으로 잡아낼
+    수 있는 최소 효과(MDE, Minimum Detectable Effect)를 계산합니다. 이보다
+    작은 효과는 실제로 있어도 놓칠 가능성이 큽니다. 매개변수는
+    ab_sample_size() 함수와 같습니다.
+
+    매개변수:
+        n_control: 대조군 인원을 지정합니다. 처리군 인원은 n_control ×
+            ratio입니다.
+        그 밖의 매개변수는 ab_sample_size() 함수를 참고하세요.
+
+    반환:
+        최소 효과의 절대 차이와 상대 차이 등을 item, value, description 열의
+        데이터프레임으로 반환합니다.
+    """
+    setup = _ab_setup(
+        metric=metric, baseline=baseline, sd=sd, alpha=alpha, power=power,
+        ratio=ratio, n_groups=n_groups, icc=icc, cluster_size=cluster_size,
+        alternative=alternative,
+    )
+    if n_control is None or n_control < 2:
+        raise ValueError('n_control은 2 이상으로 지정합니다.')
+
+    from statsmodels.stats.power import NormalIndPower, TTestIndPower
+
+    if metric == 'proportion':
+        engine, effect_name = NormalIndPower(), "Cohen's h"
+    else:
+        engine, effect_name = TTestIndPower(), "Cohen's d"
+
+    n_eff = n_control / setup['deff']
+
+    effect = engine.solve_power(
+        effect_size=None,
+        nobs1=n_eff,
+        alpha=setup['alpha_adj'],
+        power=power,
+        ratio=ratio,
+        alternative=alternative,
+    )
+    effect = float(effect)
+    lift_abs = _ab_effect_to_lift(
+        metric=metric, baseline=baseline, effect=effect, sd=sd,
+    )
+
+    rows = [
+        ('baseline', baseline, '대조군의 현재 수준'),
+        ('n_control', n_control, '대조군 인원'),
+        ('n_treatment', n_control * ratio, '처리군 1개당 인원'),
+        ('alpha', setup['alpha_adj'], '비교 1회당 유의수준'),
+        ('power', power, '검정력'),
+        ('effect_size', effect, effect_name),
+        ('mde', lift_abs, '잡아낼 수 있는 최소 개선폭(절대 차이)'),
+        ('mde_relative', lift_abs / baseline, '최소 개선폭(baseline 대비 비율)'),
+        ('treatment', baseline + lift_abs, '처리군이 최소한 도달해야 하는 수준'),
+    ]
+
+    if icc is not None:
+        rows.insert(3, ('design_effect', setup['deff'], '설계효과 1 + (점포당 고객 수 - 1) × ICC'))
+
+    return _ab_table(rows=rows)
 
 
 # End of Document

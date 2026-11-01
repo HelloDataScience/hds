@@ -201,6 +201,36 @@ fig, axes = stat.regression_diagnosis(model)  # 잔차 진단 그래프 4종
 | `ols_table` / `logit_table` | 회귀계수 검정표 / 회귀계수 검정표와 오즈비 |
 | `reg_metrics` / `clf_metrics` | 회귀 / 분류 성능 지표 |
 | `cutoff_table` | 분류 기준점별 성능 지표(표) |
+| `ab_sample_size` / `ab_power` / `ab_mde` | A/B 테스트 표본 크기 / 검정력 / 최소 효과(MDE) |
+
+---
+
+## 변경 사항 (0.5.6)
+
+- **A/B 테스트 설계 함수 3개를 `hds.stat`에 추가했습니다.** 업무 용어(현재 수준,
+  기대 개선폭, 하루 유입 고객 수)로 입력하면 결과를 표로 돌려줍니다.
+  - `ab_sample_size()`: 기대 효과를 잡아내는 데 필요한 그룹별 인원
+  - `ab_power()`: 정해진 인원으로 효과를 잡아낼 확률(검정력)
+  - `ab_mde()`: 정해진 인원으로 잡아낼 수 있는 최소 효과(MDE)
+- **지원하는 상황**
+  | 상황 | 매개변수 |
+  | --- | --- |
+  | 비율 지표(구매전환율, 쿠폰 사용률 등) | `metric='proportion'` (Cohen's h, 정규분포) |
+  | 평균 지표(객단가, 고객당 매출 등) | `metric='mean'`, `sd` (Cohen's d, t분포) |
+  | 개선폭을 %로 입력 | `relative=True` |
+  | 대조군과 처리군 인원을 다르게 배정 | `ratio` |
+  | 처리군이 여러 개 | `n_groups` (Bonferroni 보정) |
+  | 점포 단위로 배정 | `icc`, `cluster_size` (설계효과) |
+  | 실험 기간 환산 | `daily_traffic` |
+  ```python
+  from hds import stat
+
+  # 전환율 10% → 12%, 하루 1,500명 유입
+  stat.ab_sample_size(baseline=0.10, lift=0.02, daily_traffic=1500)
+  ```
+- 비율 지표는 `statsmodels`의 `proportion_effectsize()`와 `NormalIndPower`,
+  평균 지표는 `TTestIndPower`와 같은 값을 냅니다. 무작위 실험 시뮬레이션으로
+  목표 검정력(0.8)이 나오는지 확인했습니다.
 
 ---
 
@@ -482,6 +512,12 @@ vif(model) -> pd.DataFrame
 reg_metrics(y_true, y_pred) -> pd.DataFrame
 clf_metrics(y_true, y_pred) -> ClfMetrics
 cutoff_table(y_true, y_prob, pos_label=None) -> pd.DataFrame
+ab_sample_size(metric='proportion', baseline=None, lift=None, relative=False,
+               sd=None, alpha=0.05, power=0.8, ratio=1.0, n_groups=2,
+               icc=None, cluster_size=None, daily_traffic=None,
+               alternative='two-sided') -> pd.DataFrame
+ab_power(metric='proportion', baseline=None, lift=None, n_control=None, ...) -> pd.DataFrame
+ab_mde(metric='proportion', baseline=None, n_control=None, ...) -> pd.DataFrame
 ```
 
 ### 규제 회귀 계수 경로 예시
