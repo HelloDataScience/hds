@@ -117,6 +117,38 @@ def test_mde_shrinks_with_more_customers():
     assert value(large, 'mde') < value(small, 'mde')
 
 
+# n_treatment
+@pytest.mark.parametrize('func, kwargs', [
+    (stat.ab_power, {'lift': 0.02}),
+    (stat.ab_mde, {}),
+])
+def test_n_treatment_equals_ratio(func, kwargs):
+    by_count = func(baseline=0.10, n_control=4000, n_treatment=3850, **kwargs)
+    by_ratio = func(baseline=0.10, n_control=4000, ratio=3850 / 4000, **kwargs)
+    pd.testing.assert_frame_equal(by_count, by_ratio)
+
+
+def test_n_treatment_is_reported_as_given():
+    table = stat.ab_mde(baseline=0.10, n_control=4000, n_treatment=3850)
+    assert value(table, 'n_treatment') == 3850
+
+
+def test_power_with_n_treatment_matches_statsmodels():
+    h = proportion_effectsize(prop1=0.12, prop2=0.10)
+    expected = NormalIndPower().power(effect_size=h, nobs1=4000, alpha=0.05, ratio=3850 / 4000)
+    table = stat.ab_power(baseline=0.10, lift=0.02, n_control=4000, n_treatment=3850)
+    assert value(table, 'power') == pytest.approx(expected, abs=1e-4)
+
+
+@pytest.mark.parametrize('kwargs, message', [
+    ({'n_treatment': 3850, 'ratio': 0.5}, '하나만'),
+    ({'n_treatment': 1}, 'n_treatment'),
+])
+def test_n_treatment_rejects_bad_input(kwargs, message):
+    with pytest.raises(ValueError, match=message):
+        stat.ab_mde(baseline=0.10, n_control=4000, **kwargs)
+
+
 # 입력값 검사
 @pytest.mark.parametrize('kwargs, message', [
     ({'metric': 'ratio', 'baseline': 0.1, 'lift': 0.02}, 'metric'),

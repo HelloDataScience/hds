@@ -205,6 +205,20 @@ fig, axes = stat.regression_diagnosis(model)  # 잔차 진단 그래프 4종
 
 ---
 
+## 변경 사항 (다음 버전, 배포 예정)
+
+- **`ab_power()`, `ab_mde()`에 `n_treatment` 매개변수를 추가했습니다.** 탈퇴나
+  쿠폰 발송 실패로 처리군 인원이 대조군과 달라졌을 때, 비율(`ratio`)을 계산하지
+  않고 실제 인원을 바로 넣을 수 있습니다. `ratio`와 함께 지정하면 오류를 냅니다.
+  ```python
+  from hds import stat
+
+  # 대조군 4,000명, 처리군 3,850명으로 잡아낼 수 있는 최소 효과
+  stat.ab_mde(baseline=0.10, n_control=4000, n_treatment=3850)
+  ```
+
+---
+
 ## 변경 사항 (0.5.6)
 
 - **A/B 테스트 설계 함수 3개를 `hds.stat`에 추가했습니다.** 업무 용어(현재 수준,
@@ -516,8 +530,10 @@ ab_sample_size(metric='proportion', baseline=None, lift=None, relative=False,
                sd=None, alpha=0.05, power=0.8, ratio=1.0, n_groups=2,
                icc=None, cluster_size=None, daily_traffic=None,
                alternative='two-sided') -> pd.DataFrame
-ab_power(metric='proportion', baseline=None, lift=None, n_control=None, ...) -> pd.DataFrame
-ab_mde(metric='proportion', baseline=None, n_control=None, ...) -> pd.DataFrame
+ab_power(metric='proportion', baseline=None, lift=None, n_control=None, ...,
+         n_treatment=None) -> pd.DataFrame
+ab_mde(metric='proportion', baseline=None, n_control=None, ...,
+       n_treatment=None) -> pd.DataFrame
 ```
 
 ### 규제 회귀 계수 경로 예시
