@@ -216,6 +216,13 @@ fig, axes = stat.regression_diagnosis(model)  # 잔차 진단 그래프 4종
   # 대조군 4,000명, 처리군 3,850명으로 잡아낼 수 있는 최소 효과
   stat.ab_mde(baseline=0.10, n_control=4000, n_treatment=3850)
   ```
+- **`plot.box_group()`에 `order` 매개변수를 추가했습니다.** x축 범주의 순서를
+  지정할 수 있고, 평균 숫자와 `palette` 색상도 같은 순서를 따릅니다. 생략하면
+  지금처럼 오름차순으로 정렬합니다.
+  ```python
+  plot.box_group(data=iris, x='species', y='petal_length',
+                 order=['virginica', 'setosa', 'versicolor'])
+  ```
 
 ---
 
@@ -501,7 +508,7 @@ fig, axes = stat.regression_diagnosis(model)  # 잔차 진단 그래프 4종
 
 ```python
 # hds.plot  (tree를 제외한 시각화 함수는 ax=None을 받고 Axes를 반환)
-box_group(data, x, y, palette=None, legend=False, ax=None) -> plt.Axes
+box_group(data, x, y, palette=None, legend=False, ax=None, order=None) -> plt.Axes
 scatter(data, x, y, color='0.3', ax=None) -> plt.Axes
 regline(data, x, y, color='0.3', size=15, ax=None) -> plt.Axes
 bar_freq(data, x, color=None, palette=None, legend=False, ax=None) -> plt.Axes
