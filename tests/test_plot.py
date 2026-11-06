@@ -6,7 +6,9 @@ from pathlib import Path
 
 import matplotlib
 import matplotlib.pyplot as plt
+import pandas as pd
 import pytest
+import seaborn as sns
 from sklearn import metrics
 
 from hds import plot
@@ -155,3 +157,59 @@ def test_set_font_downloads_once_and_sets_rcparams(monkeypatch, tmp_path):
         count = len(calls)
         plot.set_font(font_name='Test Font')
         assert len(calls) == count
+
+
+# box_group 테스트용 데이터 (범주별 평균: a=1, b=2, c=3)
+@pytest.fixture
+def box_data():
+    return pd.DataFrame(
+        data={
+            'group': ['b', 'b', 'a', 'a', 'c', 'c'],
+            'value': [1.5, 2.5, 0.5, 1.5, 2.5, 3.5],
+        }
+    )
+
+
+# x축 눈금 이름을 추출하는 함수
+def tick_labels(ax):
+    return [tick.get_text() for tick in ax.get_xticklabels()]
+
+
+# 평균 숫자를 (x 위치, y 위치, 문자열)로 추출하는 함수
+def mean_labels(ax):
+    return [(text.get_position()[0], text.get_position()[1], text.get_text())
+            for text in ax.texts]
+
+
+def test_box_group_sorts_categories_by_default(box_data):
+    ax = plot.box_group(data=box_data, x='group', y='value')
+    assert tick_labels(ax) == ['a', 'b', 'c']
+    assert mean_labels(ax) == [(0, 1.0, '1.00'), (1, 2.0, '2.00'), (2, 3.0, '3.00')]
+
+
+def test_box_group_order_sets_ticks_and_mean_labels(box_data):
+    ax = plot.box_group(data=box_data, x='group', y='value', order=['c', 'a', 'b'])
+    assert tick_labels(ax) == ['c', 'a', 'b']
+    assert mean_labels(ax) == [(0, 3.0, '3.00'), (1, 1.0, '1.00'), (2, 2.0, '2.00')]
+
+
+def test_box_group_order_applies_palette_in_same_order(box_data):
+    palette = ['#ff0000', '#00ff00', '#0000ff']
+    ax = plot.box_group(data=box_data, x='group', y='value', palette=palette, order=['c', 'a', 'b'])
+    boxes = [patch for patch in ax.patches if patch.get_facecolor()[3] > 0]
+    # 각 상자의 x 위치 순서대로 색상을 확인합니다.
+    boxes = sorted(boxes, key=lambda patch: patch.get_path().get_extents().x0)
+    # seaborn은 상자 색의 채도를 기본값 0.75로 낮춰서 그립니다.
+    expected = [matplotlib.colors.to_hex(sns.desaturate(color, 0.75)) for color in palette]
+    assert [matplotlib.colors.to_hex(patch.get_facecolor()) for patch in boxes] == expected
+
+
+def test_box_group_order_subset_keeps_overall_mean(box_data):
+    ax = plot.box_group(data=box_data, x='group', y='value', order=['c', 'a'])
+    assert tick_labels(ax) == ['c', 'a']
+    assert ax.lines[-1].get_ydata()[0] == pytest.approx(2.0)
+
+
+def test_box_group_order_rejects_unknown_category(box_data):
+    with pytest.raises(ValueError, match='z'):
+        plot.box_group(data=box_data, x='group', y='value', order=['a', 'z'])

@@ -403,10 +403,11 @@ def box_group(
     palette: list = None,
     legend: bool = False,
     ax: plt.Axes = None,
+    order: list = None,
 ) -> plt.Axes:
     """
     이 함수는 범주형 변수(x축)에 따라 연속형 변수(y축)의 상자 수염 그림을
-    그립니다. 상자에 빨간 점은 해당 범주의 평균이며, 가로 직선은 전체
+    그립니다. 상자 안의 숫자는 해당 범주의 평균이며, 빨간 점선은 전체
     평균입니다.
 
     매개변수:
@@ -417,6 +418,9 @@ def box_group(
         legend: 범례 추가 여부를 True 또는 False로 지정합니다.(기본값: False)
         ax: 그래프를 그릴 matplotlib Axes 객체를 지정합니다. 생략하면 현재
             Axes에 그립니다.(기본값: None)
+        order: x축에 표시할 범주의 순서를 리스트로 지정합니다. 일부 범주만
+            지정하면 해당 범주만 그리며, 전체 평균은 모든 데이터로 계산합니다.
+            생략하면 범주를 오름차순으로 정렬합니다.(기본값: None)
 
     반환값:
         그래프를 그린 matplotlib Axes 객체를 반환합니다.
@@ -425,12 +429,19 @@ def box_group(
 
     avg = data.groupby(by=x)[y].mean()
 
+    if order is not None:
+        unknown = [value for value in order if value not in avg.index]
+        if unknown:
+            raise ValueError(f'order에 {x}에 없는 범주가 있습니다: {unknown}')
+        avg = avg.reindex(index=order)
+
     sns.boxplot(
         data=data,
         x=x,
         y=y,
         hue=x,
         order=avg.index,
+        hue_order=avg.index,
         palette=palette,
         flierprops={
             'marker': 'o',

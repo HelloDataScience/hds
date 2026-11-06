@@ -1236,6 +1236,28 @@ def _ab_setup(
     return {'alpha_adj': alpha_adj, 'deff': deff}
 
 
+# 처리군 인원을 대조군 대비 비율로 바꾸는 함수
+def _ab_ratio(n_control: int, n_treatment: int, ratio: float) -> float:
+    """
+    이 함수는 ab_power(), ab_mde() 함수에서 n_treatment(처리군 인원)를 지정하면
+    n_treatment ÷ n_control을 ratio로 반환하고, 지정하지 않으면 ratio를 그대로
+    반환합니다.
+    """
+    if n_control is None or n_control < 2:
+        raise ValueError('n_control은 2 이상으로 지정합니다.')
+
+    if n_treatment is None:
+        return ratio
+
+    if ratio != 1.0:
+        raise ValueError('n_treatment와 ratio는 둘 중 하나만 지정합니다.')
+
+    if n_treatment < 2:
+        raise ValueError('n_treatment는 2 이상으로 지정합니다.')
+
+    return n_treatment / n_control
+
+
 # 기대 개선폭을 절대 차이로 바꾸는 함수
 def _ab_lift(baseline: float, lift: float, relative: bool) -> float:
     """
@@ -1449,6 +1471,7 @@ def ab_power(
     icc: float = None,
     cluster_size: int = None,
     alternative: str = 'two-sided',
+    n_treatment: int = None,
 ) -> pd.DataFrame:
     """
     이 함수는 이미 정해진 인원으로 A/B 테스트를 할 때, 기대하는 효과가 실제로
@@ -1458,19 +1481,22 @@ def ab_power(
     매개변수:
         n_control: 대조군 인원을 지정합니다. 처리군 인원은 n_control ×
             ratio입니다.
+        n_treatment: 처리군 1개당 실제 인원을 지정합니다. 탈퇴나 발송 실패로
+            처리군 인원이 대조군과 달라졌을 때 사용하며, 지정하면 ratio 대신
+            n_treatment ÷ n_control을 사용합니다. ratio와 함께 지정할 수
+            없습니다.
         그 밖의 매개변수는 ab_sample_size() 함수를 참고하세요.
 
     반환:
         검정력과 효과 크기 등을 item, value, description 열의 데이터프레임으로
         반환합니다.
     """
+    ratio = _ab_ratio(n_control=n_control, n_treatment=n_treatment, ratio=ratio)
     setup = _ab_setup(
         metric=metric, baseline=baseline, sd=sd, alpha=alpha, power=None,
         ratio=ratio, n_groups=n_groups, icc=icc, cluster_size=cluster_size,
         alternative=alternative,
     )
-    if n_control is None or n_control < 2:
-        raise ValueError('n_control은 2 이상으로 지정합니다.')
 
     lift_abs = _ab_lift(baseline=baseline, lift=lift, relative=relative)
     effect, engine, effect_name = _ab_effect(
@@ -1495,7 +1521,7 @@ def ab_power(
         ('effect_size', effect, effect_name),
         ('alpha', setup['alpha_adj'], '비교 1회당 유의수준'),
         ('n_control', n_control, '대조군 인원'),
-        ('n_treatment', n_control * ratio, '처리군 1개당 인원'),
+        ('n_treatment', n_treatment or n_control * ratio, '처리군 1개당 인원'),
         ('power', float(result), '검정력'),
     ]
 
@@ -1518,6 +1544,7 @@ def ab_mde(
     icc: float = None,
     cluster_size: int = None,
     alternative: str = 'two-sided',
+    n_treatment: int = None,
 ) -> pd.DataFrame:
     """
     이 함수는 이미 정해진 인원으로 A/B 테스트를 할 때, 주어진 검정력으로 잡아낼
@@ -1528,19 +1555,22 @@ def ab_mde(
     매개변수:
         n_control: 대조군 인원을 지정합니다. 처리군 인원은 n_control ×
             ratio입니다.
+        n_treatment: 처리군 1개당 실제 인원을 지정합니다. 탈퇴나 발송 실패로
+            처리군 인원이 대조군과 달라졌을 때 사용하며, 지정하면 ratio 대신
+            n_treatment ÷ n_control을 사용합니다. ratio와 함께 지정할 수
+            없습니다.
         그 밖의 매개변수는 ab_sample_size() 함수를 참고하세요.
 
     반환:
         최소 효과의 절대 차이와 상대 차이 등을 item, value, description 열의
         데이터프레임으로 반환합니다.
     """
+    ratio = _ab_ratio(n_control=n_control, n_treatment=n_treatment, ratio=ratio)
     setup = _ab_setup(
         metric=metric, baseline=baseline, sd=sd, alpha=alpha, power=power,
         ratio=ratio, n_groups=n_groups, icc=icc, cluster_size=cluster_size,
         alternative=alternative,
     )
-    if n_control is None or n_control < 2:
-        raise ValueError('n_control은 2 이상으로 지정합니다.')
 
     from statsmodels.stats.power import NormalIndPower, TTestIndPower
 
@@ -1567,7 +1597,7 @@ def ab_mde(
     rows = [
         ('baseline', baseline, '대조군의 현재 수준'),
         ('n_control', n_control, '대조군 인원'),
-        ('n_treatment', n_control * ratio, '처리군 1개당 인원'),
+        ('n_treatment', n_treatment or n_control * ratio, '처리군 1개당 인원'),
         ('alpha', setup['alpha_adj'], '비교 1회당 유의수준'),
         ('power', power, '검정력'),
         ('effect_size', effect, effect_name),

@@ -205,6 +205,29 @@ fig, axes = stat.regression_diagnosis(model)  # 잔차 진단 그래프 4종
 
 ---
 
+## 변경 사항 (0.5.7)
+
+- **`ab_power()`, `ab_mde()`에 `n_treatment` 매개변수를 추가했습니다.** 탈퇴나
+  쿠폰 발송 실패로 처리군 인원이 대조군과 달라졌을 때, 비율(`ratio`)을 계산하지
+  않고 실제 인원을 바로 넣을 수 있습니다. `ratio`와 함께 지정하면 오류를 냅니다.
+  ```python
+  from hds import stat
+
+  # 대조군 4,000명, 처리군 3,850명으로 잡아낼 수 있는 최소 효과
+  stat.ab_mde(baseline=0.10, n_control=4000, n_treatment=3850)
+  ```
+- **`plot.box_group()`에 `order` 매개변수를 추가했습니다.** x축 범주의 순서를
+  지정할 수 있고, 평균 숫자와 `palette` 색상도 같은 순서를 따릅니다. 생략하면
+  지금처럼 오름차순으로 정렬합니다. 이제 `order`를 생략해도 `palette` 색상은 x축
+  순서대로 배정됩니다. 이전에는 데이터에 처음 나온 순서로 배정되어, 문자형 범주는
+  x축 순서와 색상 순서가 다를 수 있었습니다.
+  ```python
+  plot.box_group(data=iris, x='species', y='petal_length',
+                 order=['virginica', 'setosa', 'versicolor'])
+  ```
+
+---
+
 ## 변경 사항 (0.5.6)
 
 - **A/B 테스트 설계 함수 3개를 `hds.stat`에 추가했습니다.** 업무 용어(현재 수준,
@@ -487,7 +510,7 @@ fig, axes = stat.regression_diagnosis(model)  # 잔차 진단 그래프 4종
 
 ```python
 # hds.plot  (tree를 제외한 시각화 함수는 ax=None을 받고 Axes를 반환)
-box_group(data, x, y, palette=None, legend=False, ax=None) -> plt.Axes
+box_group(data, x, y, palette=None, legend=False, ax=None, order=None) -> plt.Axes
 scatter(data, x, y, color='0.3', ax=None) -> plt.Axes
 regline(data, x, y, color='0.3', size=15, ax=None) -> plt.Axes
 bar_freq(data, x, color=None, palette=None, legend=False, ax=None) -> plt.Axes
@@ -516,8 +539,10 @@ ab_sample_size(metric='proportion', baseline=None, lift=None, relative=False,
                sd=None, alpha=0.05, power=0.8, ratio=1.0, n_groups=2,
                icc=None, cluster_size=None, daily_traffic=None,
                alternative='two-sided') -> pd.DataFrame
-ab_power(metric='proportion', baseline=None, lift=None, n_control=None, ...) -> pd.DataFrame
-ab_mde(metric='proportion', baseline=None, n_control=None, ...) -> pd.DataFrame
+ab_power(metric='proportion', baseline=None, lift=None, n_control=None, ...,
+         n_treatment=None) -> pd.DataFrame
+ab_mde(metric='proportion', baseline=None, n_control=None, ...,
+       n_treatment=None) -> pd.DataFrame
 ```
 
 ### 규제 회귀 계수 경로 예시
