@@ -213,3 +213,49 @@ def test_box_group_order_subset_keeps_overall_mean(box_data):
 def test_box_group_order_rejects_unknown_category(box_data):
     with pytest.raises(ValueError, match='z'):
         plot.box_group(data=box_data, x='group', y='value', order=['a', 'z'])
+
+
+# 나무 그림 글꼴 테스트
+@pytest.mark.parametrize(
+    'system, expected',
+    [('Windows', 'Malgun Gothic'), ('Darwin', 'helvetica'), ('Linux', 'helvetica')],
+)
+def test_tree_font_name_default(monkeypatch, system, expected):
+    monkeypatch.setattr(plot.platform, 'system', lambda: system)
+    assert plot._tree_font_name() == expected
+
+
+def test_tree_font_name_user_value(monkeypatch):
+    monkeypatch.setattr(plot.platform, 'system', lambda: 'Windows')
+    assert plot._tree_font_name(font_name='NanumGothic') == 'NanumGothic'
+
+
+def test_tree_writes_font_to_dot_source(monkeypatch, tmp_path):
+    import sys
+    import types
+
+    from sklearn.tree import DecisionTreeClassifier
+
+    captured = {}
+
+    # Graphviz 실행 파일 없이 dot 소스만 확인하는 가짜 모듈
+    class FakeSource:
+        def __init__(self, source, format):
+            captured['source'] = source
+
+        def pipe(self, format):
+            return b'png'
+
+    fake = types.ModuleType('graphviz')
+    fake.Source = FakeSource
+    monkeypatch.setitem(sys.modules, 'graphviz', fake)
+    monkeypatch.setattr(plot.platform, 'system', lambda: 'Windows')
+
+    X = pd.DataFrame(data={'x': [1.0, 2.0, 3.0, 4.0]})
+    model = DecisionTreeClassifier(random_state=0).fit(X=X, y=[0, 0, 1, 1])
+    plot.tree(model=model, file_name='check', class_name=['안 함', '함'],
+              path=str(tmp_path))
+
+    assert 'fontname="Malgun Gothic"' in captured['source']
+    assert 'helvetica' not in captured['source']
+    assert (tmp_path / 'check.png').read_bytes() == b'png'
