@@ -995,11 +995,32 @@ def kde2d(
 
 
 # 의사결정나무 모델 시각화
+def _tree_font_name(font_name: str = None) -> str:
+    """
+    이 함수는 나무 그림에 사용할 글꼴명을 반환합니다. Windows용 Graphviz는
+    'helvetica'를 한글이 없는 Arial로 바꿔 사용하므로, Windows에서는 맑은
+    고딕을 기본값으로 사용합니다.
+
+    매개변수:
+        font_name: 글꼴명을 문자열로 지정합니다. 생략하면 운영체제에 맞는
+            기본 글꼴명을 사용합니다.(기본값: None)
+
+    반환값:
+        글꼴명을 문자열로 반환합니다.
+    """
+    if font_name is not None:
+        return font_name
+    if platform.system() == 'Windows':
+        return 'Malgun Gothic'
+    return 'helvetica'
+
+
 def tree(
     model,
     file_name: str = None,
     class_name: str = None,
     path: str = None,
+    font_name: str = None,
 ) -> None:
     """
     이 함수는 의사결정나무 모델을 시각화하여 png 파일로 저장합니다. 저장할
@@ -1014,6 +1035,10 @@ def tree(
             작업 경로가 image 폴더일 때 현재 작업 경로에 저장하고, 그 밖에는
             현재 작업 경로와 형제 관계인 image 폴더에 저장합니다. 해당 폴더가
             없으면 새로 만듭니다.(기본값: None)
+        font_name: 나무 그림의 글자에 사용할 글꼴명을 문자열로 지정합니다.
+            운영체제에 설치된 글꼴이어야 합니다. 생략하면 Windows는 한글을
+            표시할 수 있는 'Malgun Gothic'(맑은 고딕)을, 그 밖의 운영체제는
+            'helvetica'를 사용합니다.(기본값: None)
 
     반환값:
         그래프 외에 반환하는 객체는 없습니다.
@@ -1067,6 +1092,11 @@ def tree(
             '(DecisionTreeRegressor 또는 DecisionTreeClassifier)로 '
             '지정하세요.'
         )
+
+    # 한글이 깨지지 않도록 나무 그림의 글꼴 지정
+    source = source.replace(
+        'fontname="helvetica"', f'fontname="{_tree_font_name(font_name)}"'
+    )
 
     # png 파일을 저장할 폴더가 없으면 생성
     os.makedirs(name=path, exist_ok=True)

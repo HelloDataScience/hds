@@ -205,6 +205,21 @@ fig, axes = stat.regression_diagnosis(model)  # 잔차 진단 그래프 4종
 
 ---
 
+## 변경 사항 (0.5.8)
+
+- **`plot.tree()`가 Windows에서 나무 그림의 한글을 표시합니다.** 사이킷런의
+  `export_graphviz()`는 글꼴을 `helvetica`로 지정하는데, Windows용 Graphviz는
+  이를 한글이 없는 Arial로 바꿔 사용하므로 범주명 등의 한글이 네모로 표시되었습니다.
+  이제 Windows에서는 맑은 고딕(`Malgun Gothic`)을 기본 글꼴로 사용하고, 그 밖의
+  운영체제는 지금처럼 `helvetica`를 사용합니다.
+- **`plot.tree()`에 `font_name` 매개변수를 추가했습니다.** 운영체제에 설치된
+  글꼴명을 지정하면 나무 그림의 글꼴을 바꿀 수 있습니다.
+  ```python
+  plot.tree(model, class_name=['재구매 안 함', '재구매'], font_name='NanumGothic')
+  ```
+
+---
+
 ## 변경 사항 (0.5.7)
 
 - **`ab_power()`, `ab_mde()`에 `n_treatment` 매개변수를 추가했습니다.** 탈퇴나
