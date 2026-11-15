@@ -1,4 +1,4 @@
-# 관련 라이브러리 호출
+# 관련 라이브러리 임포트
 import html
 import keyword
 
@@ -1165,7 +1165,7 @@ def epi_roc(
     반환:
         그래프를 그린 matplotlib Axes 객체를 반환합니다.
     """
-    # 순환 참조를 피하려고 함수 안에서 호출
+    # 순환 참조를 피하려고 함수 안에서 임포트
     from hds.plot import roc_cutoff
 
     return roc_cutoff(y_true=y_true, y_prob=y_prob, ax=ax, pos_label=pos_label)
