@@ -205,6 +205,23 @@ fig, axes = stat.regression_diagnosis(model)  # 잔차 진단 그래프 4종
 
 ---
 
+## 변경 사항 (0.5.10)
+
+- **`plot.download_google_font_file()`에 `font_name` 매개변수를 추가했습니다.**
+  폰트명을 지정하면 해당 폰트의 모든 ttf 파일을 다운로드 폴더에 내려받고 파일
+  경로를 리스트로 반환합니다. 지금처럼 `font_file`에 ttf 파일명을 지정하면 파일
+  경로를 문자열로 반환합니다. 두 매개변수 중 하나만 지정합니다.
+  ```python
+  plot.download_google_font_file(font_name='Gowun Batang')
+  plot.download_google_font_file(font_file='GowunBatang-Regular.ttf')
+  ```
+- **`font_file`에 폰트명을 지정했을 때 원인을 알 수 있는 오류 메시지를
+  보여줍니다.** 0.5.9에서는 `font_file='Gowun Batang'`처럼 폰트명을 지정하면
+  `InvalidURL` 오류가 발생했습니다. 이제 ttf 파일명을 지정하거나 `font_name`
+  매개변수를 사용하라고 안내합니다.
+
+---
+
 ## 변경 사항 (0.5.9)
 
 - **`plot.search_google_font_file()`과 `plot.add_google_font()`가 다시
