@@ -128,33 +128,15 @@ def search_google_font_file(font_name: str) -> list:
     반환값:
         구글 폰트 ttf 파일명을 리스트로 반환합니다.
     """
-    # 선택 의존성 패키지 호출
-    requests = import_optional('requests', extra='font')
-    bs4 = import_optional('bs4', extra='font', package='beautifulsoup4')
+    # 구글 폰트 저장소의 METADATA.pb 파일에서 글꼴 파일 URL 목록 생성
+    try:
+        urls = _google_font_urls(font_name)
+    except ValueError as error:
+        raise FileNotFoundError(f'Font not found with {font_name}') from error
 
-    # 구글 폰트명에서 공백 제거
-    font_name_no_space = font_name.replace(' ', '')
-
-    # 구글 폰트명 URL 생성
-    url = (
-        'https://github.com/google/fonts/tree/main/ofl/'
-        f'{font_name_no_space.lower()}'
-    )
-
-    # 구글 폰트 파일 목록 내려받기
-    response = requests.get(url)
-    if response.status_code != 200:
-        raise FileNotFoundError(f'Font not found with {font_name}')
-
-    soup = bs4.BeautifulSoup(markup=response.text, features='html.parser')
-    selector = (
-        'script[type="application/json"]'
-        '[data-target="react-app.embeddedData"]'
-    )
-    items = soup.select(selector)
-    payload = json.loads(s=items[0].text)
-    files = payload['payload']['tree']['items']
-    return [item['name'] for item in files if '.ttf' in item['name']]
+    # URL에서 ttf 파일명만 추출
+    files = [urllib.parse.unquote(url.rsplit('/', 1)[-1]) for url in urls]
+    return [file for file in files if file.endswith('.ttf')]
 
 
 # 구글 폰트 파일을 다운로드 폴더에 내려받는 함수
@@ -168,36 +150,32 @@ def download_google_font_file(font_file: str) -> str:
     반환값:
         다운로드 폴더에 내려받은 구글 폰트 ttf 파일명을 문자열로 반환합니다.
     """
-    # 선택 의존성 패키지 호출
-    requests = import_optional('requests', extra='font')
-
     # 다운로드 폴더 경로 지정
     download_path = os.path.join(os.path.expanduser('~'), 'Downloads')
     os.makedirs(name=download_path, exist_ok=True)
     font_path = os.path.join(download_path, font_file)
 
-    # 구글 폰트명 생성
-    font_name = re.split(
-        pattern=r'(-)|(\[)|(\.ttf)',
-        string=font_file,
-    )[0].lower()
+    # ttf 파일명에서 구글 폰트 저장소의 폴더명 생성
+    folder = re.split(pattern=r'[-\[.]', string=font_file)[0].lower()
+    domain = 'https://raw.githubusercontent.com/google/fonts/main'
 
-    # 구글 폰트 파일 다운로드 URL 생성
-    domain = (
-        'https://raw.githubusercontent.com/google/fonts/'
-        'refs/heads/main/ofl/'
-    )
-    url = os.path.join(domain, font_name, font_file)
+    # 라이선스별 폴더를 차례로 확인하여 구글 폰트 파일 내려받기
+    for license_dir in ('ofl', 'apache', 'ufl'):
+        file_url = urllib.parse.quote(font_file)
+        url = f'{domain}/{license_dir}/{folder}/{file_url}'
+        try:
+            with urllib.request.urlopen(url, timeout=60) as r:
+                content = r.read()
+        except urllib.error.HTTPError as error:
+            if error.code == 404:
+                continue
+            raise
+        with open(file=font_path, mode='wb') as file:
+            file.write(content)
+        print(f'Downloaded to {font_path}')
+        return font_path
 
-    # 구글 폰트 파일 내려받기
-    response = requests.get(url)
-    if response.status_code != 200:
-        raise FileNotFoundError(f'Font not found at {url}')
-
-    with open(file=font_path, mode='wb') as file:
-        file.write(response.content)
-    print(f'Downloaded to {font_path}')
-    return font_path
+    raise FileNotFoundError(f'Font not found with {font_file}')
 
 
 # 구글 폰트를 설치하고 다운로드 폴더에서 삭제하는 함수

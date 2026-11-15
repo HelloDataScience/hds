@@ -41,7 +41,7 @@ pip install --upgrade hds
 | 옵션 | 추가 패키지 | 필요한 함수 |
 | --- | --- | --- |
 | `tree` | graphviz | `plot.tree()` |
-| `font` | requests, beautifulsoup4 | `plot.add_google_font()` |
+| `font` | (없음) | 0.5.9부터 설치할 패키지 없음(이전 설치 명령 호환용) |
 | `notebook` | (없음) | 0.4.0부터 설치할 패키지 없음(이전 설치 명령 호환용) |
 | `varname` | varname | `plot.roc_curve()`·`plot.pr_curve()`의 범례 변수명 자동 표시 |
 | `all` | 위 전체 | — |
@@ -202,6 +202,21 @@ fig, axes = stat.regression_diagnosis(model)  # 잔차 진단 그래프 4종
 | `reg_metrics` / `clf_metrics` | 회귀 / 분류 성능 지표 |
 | `cutoff_table` | 분류 기준점별 성능 지표(표) |
 | `ab_sample_size` / `ab_power` / `ab_mde` | A/B 테스트 표본 크기 / 검정력 / 최소 효과(MDE) |
+
+---
+
+## 변경 사항 (0.5.9)
+
+- **`plot.search_google_font_file()`과 `plot.add_google_font()`가 다시
+  동작합니다.** GitHub 웹 페이지 구조가 바뀌어 `KeyError: 'tree'` 오류가
+  발생했습니다. 이제 웹 페이지 대신 구글 폰트 저장소의 `METADATA.pb` 파일에서
+  글꼴 파일 목록을 읽으므로 페이지 구조가 바뀌어도 영향을 받지 않습니다.
+- **`plot.download_google_font_file()`이 `ofl` 외에 `apache`, `ufl` 폴더의
+  글꼴도 내려받습니다.** Windows에서 다운로드 주소에 역슬래시가 들어가던 문제도
+  고쳤습니다.
+- **`font` 선택 설치 옵션에 필요한 패키지가 없어졌습니다.** 구글 폰트 함수가
+  requests와 beautifulsoup4 없이 동작합니다. `pip install 'hds[font]'` 명령은
+  지금처럼 사용할 수 있습니다.
 
 ---
 
@@ -582,8 +597,7 @@ plot.coef_path(X=X_train, y=y_train, model='lasso', alpha=model_cv.alpha_)
 - Python >= 3.11
 - **필수**: numpy, pandas, scipy, matplotlib, seaborn(>=0.13),
   statsmodels, scikit-learn(>=1.4)
-- **선택**: graphviz(`tree`), requests·beautifulsoup4(`font`),
-  varname(`varname`)
+- **선택**: graphviz(`tree`), varname(`varname`)
 
 필수 패키지는 설치 시 자동으로 함께 설치되고, 선택 패키지는
 [선택 설치 옵션](#선택-설치-옵션-extras)으로 필요할 때만 설치합니다.

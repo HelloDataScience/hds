@@ -1,5 +1,6 @@
 # 분류 모델 그래프 함수 테스트
 import io
+import os
 import urllib.error
 import urllib.request
 from pathlib import Path
@@ -119,6 +120,38 @@ def test_google_font_urls_returns_all_files(monkeypatch):
         'TestFont-Italic.ttf',
         'TestFont-Bold.ttf',
     ]
+
+
+def test_search_google_font_file_reads_metadata(monkeypatch):
+    def fake_urlopen(url, timeout):
+        if '/ofl/testfont/' not in url:
+            raise urllib.error.HTTPError(url, 404, 'Not Found', None, None)
+        return FakeResponse(METADATA)
+
+    monkeypatch.setattr(urllib.request, 'urlopen', fake_urlopen)
+    assert plot.search_google_font_file('Test Font') == [
+        'TestFont-Thin.ttf',
+        'TestFont-Regular.ttf',
+        'TestFont-Italic.ttf',
+        'TestFont-Bold.ttf',
+    ]
+
+
+def test_download_google_font_file_tries_license_dirs(monkeypatch, tmp_path):
+    requested = []
+
+    def fake_urlopen(url, timeout):
+        requested.append(url)
+        if '/apache/testfont/TestFont-Regular.ttf' not in url:
+            raise urllib.error.HTTPError(url, 404, 'Not Found', None, None)
+        return FakeResponse(b'ttf')
+
+    monkeypatch.setattr(urllib.request, 'urlopen', fake_urlopen)
+    monkeypatch.setattr(os.path, 'expanduser', lambda path: str(tmp_path))
+    path = plot.download_google_font_file('TestFont-Regular.ttf')
+    assert open(path, 'rb').read() == b'ttf'
+    assert '\\' not in requested[-1]
+    assert [url.split('/')[-3] for url in requested] == ['ofl', 'apache']
 
 
 def test_set_font_unknown_font(monkeypatch, tmp_path):
