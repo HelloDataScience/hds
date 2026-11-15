@@ -7,8 +7,9 @@ from setuptools import find_packages, setup
 EXTRAS_REQUIRE = {
     # plot.tree() 함수로 의사결정나무를 시각화할 때 필요합니다.
     'tree': ['graphviz'],
-    # plot.add_google_font() 함수로 구글 폰트를 설치할 때 필요합니다.
-    'font': ['requests', 'beautifulsoup4'],
+    # 0.5.9부터 구글 폰트 함수가 추가 패키지 없이 동작합니다. 이전 설치
+    # 명령(hds[font])과의 호환을 위해 남겨 둡니다.
+    'font': [],
     # 0.4.0부터 stat.clf_metrics() 함수가 추가 패키지 없이 결과를 나란히
     # 출력합니다. 이전 설치 명령(hds[notebook])과의 호환을 위해 남겨 둡니다.
     'notebook': [],

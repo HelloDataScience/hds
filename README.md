@@ -41,7 +41,7 @@ pip install --upgrade hds
 | 옵션 | 추가 패키지 | 필요한 함수 |
 | --- | --- | --- |
 | `tree` | graphviz | `plot.tree()` |
-| `font` | requests, beautifulsoup4 | `plot.add_google_font()` |
+| `font` | (없음) | 0.5.9부터 설치할 패키지 없음(이전 설치 명령 호환용) |
 | `notebook` | (없음) | 0.4.0부터 설치할 패키지 없음(이전 설치 명령 호환용) |
 | `varname` | varname | `plot.roc_curve()`·`plot.pr_curve()`의 범례 변수명 자동 표시 |
 | `all` | 위 전체 | — |
@@ -582,8 +582,7 @@ plot.coef_path(X=X_train, y=y_train, model='lasso', alpha=model_cv.alpha_)
 - Python >= 3.11
 - **필수**: numpy, pandas, scipy, matplotlib, seaborn(>=0.13),
   statsmodels, scikit-learn(>=1.4)
-- **선택**: graphviz(`tree`), requests·beautifulsoup4(`font`),
-  varname(`varname`)
+- **선택**: graphviz(`tree`), varname(`varname`)
 
 필수 패키지는 설치 시 자동으로 함께 설치되고, 선택 패키지는
 [선택 설치 옵션](#선택-설치-옵션-extras)으로 필요할 때만 설치합니다.
