@@ -154,6 +154,94 @@ def test_download_google_font_file_tries_license_dirs(monkeypatch, tmp_path):
     assert [url.split('/')[-3] for url in requested] == ['ofl', 'apache']
 
 
+@pytest.mark.parametrize('font_file', ['Gowun Batang', 'GowunBatang-Regular'])
+def test_download_google_font_file_requires_ttf(monkeypatch, font_file):
+    def fake_urlopen(url, timeout):
+        raise AssertionError('urlopen should not be called')
+
+    monkeypatch.setattr(urllib.request, 'urlopen', fake_urlopen)
+    with pytest.raises(ValueError, match='font_name='):
+        plot.download_google_font_file(font_file)
+
+
+@pytest.mark.parametrize(
+    'kwargs',
+    [{}, {'font_file': 'TestFont-Regular.ttf', 'font_name': 'Test Font'}],
+)
+def test_download_google_font_file_one_argument(monkeypatch, kwargs):
+    def fake_urlopen(url, timeout):
+        raise AssertionError('urlopen should not be called')
+
+    monkeypatch.setattr(urllib.request, 'urlopen', fake_urlopen)
+    with pytest.raises(ValueError, match='하나만'):
+        plot.download_google_font_file(**kwargs)
+
+
+def test_download_google_font_file_font_name(monkeypatch, tmp_path):
+    def fake_urlopen(url, timeout):
+        if '/ofl/testfont/' not in url:
+            raise urllib.error.HTTPError(url, 404, 'Not Found', None, None)
+        if url.endswith('METADATA.pb'):
+            return FakeResponse(METADATA)
+        return FakeResponse(url.rsplit('/', 1)[1].encode())
+
+    monkeypatch.setattr(urllib.request, 'urlopen', fake_urlopen)
+    monkeypatch.setattr(os.path, 'expanduser', lambda path: str(tmp_path))
+    paths = plot.download_google_font_file(font_name='Test Font')
+    assert [os.path.basename(path) for path in paths] == [
+        'TestFont-Thin.ttf',
+        'TestFont-Regular.ttf',
+        'TestFont-Italic.ttf',
+        'TestFont-Bold.ttf',
+    ]
+    for path in paths:
+        assert open(path, 'rb').read() == os.path.basename(path).encode()
+
+
+def test_download_google_font_file_font_name_all_or_nothing(
+    monkeypatch, tmp_path
+):
+    def fake_urlopen(url, timeout):
+        if '/ofl/testfont/' not in url:
+            raise urllib.error.HTTPError(url, 404, 'Not Found', None, None)
+        if url.endswith('METADATA.pb'):
+            return FakeResponse(METADATA)
+        if url.endswith('TestFont-Bold.ttf'):
+            raise urllib.error.URLError('connection lost')
+        return FakeResponse(b'ttf')
+
+    monkeypatch.setattr(urllib.request, 'urlopen', fake_urlopen)
+    monkeypatch.setattr(os.path, 'expanduser', lambda path: str(tmp_path))
+    with pytest.raises(urllib.error.URLError):
+        plot.download_google_font_file(font_name='Test Font')
+    assert list((tmp_path / 'Downloads').glob('*.ttf')) == []
+
+
+def test_download_google_font_file_unknown_font_name(monkeypatch, tmp_path):
+    def fake_urlopen(url, timeout):
+        raise urllib.error.HTTPError(url, 404, 'Not Found', None, None)
+
+    monkeypatch.setattr(urllib.request, 'urlopen', fake_urlopen)
+    monkeypatch.setattr(os.path, 'expanduser', lambda path: str(tmp_path))
+    with pytest.raises(FileNotFoundError, match='No Such Font'):
+        plot.download_google_font_file(font_name='No Such Font')
+
+
+def test_download_google_font_file_space_in_name(monkeypatch, tmp_path):
+    requested = []
+
+    def fake_urlopen(url, timeout):
+        requested.append(url)
+        raise urllib.error.HTTPError(url, 404, 'Not Found', None, None)
+
+    monkeypatch.setattr(urllib.request, 'urlopen', fake_urlopen)
+    monkeypatch.setattr(os.path, 'expanduser', lambda path: str(tmp_path))
+    with pytest.raises(FileNotFoundError, match='search_google_font_file'):
+        plot.download_google_font_file('Gowun Batang-Regular.ttf')
+    assert all(' ' not in url for url in requested)
+    assert all('/gowunbatang/' in url for url in requested)
+
+
 def test_set_font_unknown_font(monkeypatch, tmp_path):
     def fake_urlopen(url, timeout):
         raise urllib.error.HTTPError(url, 404, 'Not Found', None, None)

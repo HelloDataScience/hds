@@ -1,4 +1,4 @@
-# 관련 라이브러리 호출
+# 관련 라이브러리 임포트
 import glob
 import inspect
 import json
@@ -140,23 +140,72 @@ def search_google_font_file(font_name: str) -> list:
 
 
 # 구글 폰트 파일을 다운로드 폴더에 내려받는 함수
-def download_google_font_file(font_file: str) -> str:
+def download_google_font_file(
+    font_file: str = None,
+    font_name: str = None,
+) -> str | list:
     """
-    이 함수는 구글 폰트 ttf 파일명을 지정하면 다운로드 폴더에 내려받습니다.
+    이 함수는 구글 폰트 ttf 파일명이나 폰트명을 지정하면 다운로드 폴더에
+    내려받습니다. font_file과 font_name 중 하나만 지정합니다.
 
     매개변수:
-        font_file: 구글 폰트 ttf 파일명을 문자열로 지정합니다.
+        font_file: 구글 폰트 ttf 파일명을 문자열로 지정합니다. 파일명은
+            search_google_font_file() 함수로 확인합니다.
+            예: 'GowunBatang-Regular.ttf' (기본값: None)
+        font_name: 구글 폰트명을 문자열로 지정하면 해당 폰트의 모든 ttf
+            파일을 내려받습니다. 예: 'Gowun Batang' (기본값: None)
 
     반환값:
-        다운로드 폴더에 내려받은 구글 폰트 ttf 파일명을 문자열로 반환합니다.
+        font_file을 지정하면 내려받은 ttf 파일 경로를 문자열로 반환합니다.
+        font_name을 지정하면 내려받은 ttf 파일 경로를 리스트로 반환합니다.
     """
+    # font_file과 font_name 중 하나만 지정했는지 확인
+    if (font_file is None) == (font_name is None):
+        raise ValueError(
+            "font_file과 font_name 중 하나만 지정하세요. "
+            "예: font_file='GowunBatang-Regular.ttf' 또는 "
+            "font_name='Gowun Batang'"
+        )
+
     # 다운로드 폴더 경로 지정
     download_path = os.path.join(os.path.expanduser('~'), 'Downloads')
     os.makedirs(name=download_path, exist_ok=True)
+
+    # 폰트명을 지정하면 모든 ttf 파일을 내려받은 다음에 저장
+    if font_name is not None:
+        try:
+            urls = _google_font_urls(font_name)
+        except ValueError as error:
+            raise FileNotFoundError(
+                f'Font not found with {font_name}'
+            ) from error
+        contents = {}
+        for url in urls:
+            file = urllib.parse.unquote(url.rsplit('/', 1)[-1])
+            if file.endswith('.ttf'):
+                with urllib.request.urlopen(url, timeout=60) as r:
+                    contents[file] = r.read()
+        font_paths = []
+        for file, content in contents.items():
+            font_path = os.path.join(download_path, file)
+            with open(file=font_path, mode='wb') as f:
+                f.write(content)
+            print(f'Downloaded to {font_path}')
+            font_paths.append(font_path)
+        return font_paths
+
+    # 폰트명 대신 ttf 파일명을 지정했는지 확인
+    if not font_file.lower().endswith('.ttf'):
+        raise ValueError(
+            "font_file에는 ttf 파일명을 지정하세요. 예: 'GowunBatang-Regular.ttf'. "
+            '폰트명으로 내려받으려면 '
+            "download_google_font_file(font_name='Gowun Batang')을 실행하세요."
+        )
     font_path = os.path.join(download_path, font_file)
 
-    # ttf 파일명에서 구글 폰트 저장소의 폴더명 생성
+    # ttf 파일명에서 공백과 기호를 제거하여 구글 폰트 저장소의 폴더명 생성
     folder = re.split(pattern=r'[-\[.]', string=font_file)[0].lower()
+    folder = re.sub(pattern=r'[^a-z0-9]', repl='', string=folder)
     domain = 'https://raw.githubusercontent.com/google/fonts/main'
 
     # 라이선스별 폴더를 차례로 확인하여 구글 폰트 파일 내려받기
@@ -175,7 +224,11 @@ def download_google_font_file(font_file: str) -> str:
         print(f'Downloaded to {font_path}')
         return font_path
 
-    raise FileNotFoundError(f'Font not found with {font_file}')
+    raise FileNotFoundError(
+        f'Font not found with {font_file}. '
+        'search_google_font_file()로 확인한 ttf 파일명을 대소문자까지 '
+        '그대로 지정하세요.'
+    )
 
 
 # 구글 폰트를 설치하고 다운로드 폴더에서 삭제하는 함수
@@ -1021,7 +1074,7 @@ def tree(
     반환값:
         그래프 외에 반환하는 객체는 없습니다.
     """
-    # 선택 의존성 패키지 호출
+    # 선택 의존성 패키지 임포트
     graphviz = import_optional(
         'graphviz',
         extra='tree',
@@ -1531,7 +1584,7 @@ def roc_cutoff(
     반환값:
         그래프를 그린 matplotlib Axes 객체를 반환합니다.
     """
-    # 순환 참조를 피하려고 함수 안에서 호출
+    # 순환 참조를 피하려고 함수 안에서 임포트
     from hds.stat import cutoff_table
 
     ax = _prepare_ax(ax)

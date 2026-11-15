@@ -1,4 +1,4 @@
-# 관련 라이브러리 호출
+# 관련 라이브러리 임포트
 import importlib
 from types import ModuleType
 
@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 
 
-# 선택 의존성 패키지를 호출하는 함수
+# 선택 의존성 패키지를 임포트하는 함수
 def import_optional(
     module: str,
     extra: str,
@@ -14,18 +14,18 @@ def import_optional(
     hint: str = None,
 ) -> ModuleType:
     """
-    이 함수는 선택 의존성 패키지를 호출합니다. 해당 패키지가 설치되어 있지
+    이 함수는 선택 의존성 패키지를 임포트합니다. 해당 패키지가 설치되어 있지
     않으면 설치 방법을 안내하는 예외를 발생시킵니다.
 
     매개변수:
-        module: 호출할 모듈명을 문자열로 지정합니다.
+        module: 임포트할 모듈명을 문자열로 지정합니다.
         extra: 해당 모듈이 포함된 추가 설치 옵션명을 문자열로 지정합니다.
         package: PyPI에 등록된 패키지명이 모듈명과 다르면 문자열로
             지정합니다.(기본값: None)
         hint: 안내 문구에 덧붙일 설명을 문자열로 지정합니다.(기본값: None)
 
     반환값:
-        호출한 모듈을 반환합니다.
+        임포트한 모듈을 반환합니다.
     """
     try:
         return importlib.import_module(name=module)
@@ -40,17 +40,17 @@ def import_optional(
         raise ImportError(message) from error
 
 
-# 선택 의존성 패키지를 호출하고 없으면 None을 반환하는 함수
+# 선택 의존성 패키지를 임포트하고 없으면 None을 반환하는 함수
 def try_import(module: str) -> ModuleType:
     """
-    이 함수는 선택 의존성 패키지를 호출하고, 설치되어 있지 않으면 예외 대신
+    이 함수는 선택 의존성 패키지를 임포트하고, 설치되어 있지 않으면 예외 대신
     None을 반환합니다.
 
     매개변수:
-        module: 호출할 모듈명을 문자열로 지정합니다.
+        module: 임포트할 모듈명을 문자열로 지정합니다.
 
     반환값:
-        호출한 모듈을 반환하고, 설치되어 있지 않으면 None을 반환합니다.
+        임포트한 모듈을 반환하고, 설치되어 있지 않으면 None을 반환합니다.
     """
     try:
         return importlib.import_module(name=module)
